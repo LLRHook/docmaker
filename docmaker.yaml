@@ -1,0 +1,76 @@
+# Docmaker Configuration
+# Run `docmaker init` to generate this file with defaults
+
+# Path to the source code repository to analyze
+source_dir: "."
+
+# Cache file for incremental updates
+cache_file: ".docmaker_cache.json"
+
+# LLM Configuration (for file classification)
+llm:
+  # Provider: "ollama", "lmstudio", "openai", "anthropic"
+  provider: "ollama"
+
+  # Model name (depends on provider)
+  model: "qwen3-vl:8b"
+
+  # API base URL
+  # - Ollama: http://localhost:11434
+  # - LM Studio: http://localhost:1234/v1
+  # - OpenAI: https://api.openai.com/v1
+  base_url: "http://localhost:11434"
+
+  # API key (required for OpenAI/Anthropic, optional for local)
+  api_key: null
+
+  # Request timeout in seconds
+  timeout: 30
+
+  # Set to false to skip LLM classification (faster, but less accurate)
+  enabled: true
+
+# Crawler Configuration
+crawler:
+  # Respect .gitignore patterns
+  respect_gitignore: true
+
+  # Additional patterns to ignore (gitignore syntax)
+  custom_ignore_patterns:
+    - "*.test.java"
+    - "*.spec.ts"
+    - "**/test/**"
+    - "**/tests/**"
+    - "**/__tests__/**"
+
+  # File extensions to include
+  include_extensions:
+    - ".java"
+    - ".py"
+    - ".go"
+    - ".ts"
+    - ".js"
+    - ".kt"
+
+  # Skip files larger than this (in KB)
+  max_file_size_kb: 500
+
+  # Number of lines to read for LLM classification
+  header_lines_for_classification: 50
+
+# Output Configuration
+output:
+  # Directory for generated Obsidian vault
+  output_dir: "./docs"
+
+  # Mirror the source directory structure
+  mirror_source_structure: true
+
+  # Include source code snippets in documentation
+  include_source_snippets: true
+
+  # Maximum lines per code snippet
+  max_snippet_lines: 50
+
+  # Generate an index file with all documented items
+  generate_index: true
