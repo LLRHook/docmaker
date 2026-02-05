@@ -39,6 +39,12 @@ htmlcov/
 output/
 *.md.bak
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
 # Environment
 .env
 .env.local
