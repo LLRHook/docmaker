@@ -186,6 +186,28 @@ def scan(source_dir: Path, config: Path | None) -> None:
 
 
 @main.command()
+@click.option(
+    "-p",
+    "--project",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=None,
+    help="Path to project to load on startup",
+)
+@click.option(
+    "--dev",
+    is_flag=True,
+    default=False,
+    help="Run in development mode (connect to Vite dev server)",
+)
+def app(project: Path | None, dev: bool) -> None:
+    """Launch the Docmaker desktop application with knowledge graph visualization."""
+    from docmaker.app.main import run_app
+
+    project_path = str(project.resolve()) if project else None
+    sys.exit(run_app(dev_mode=dev, project_path=project_path))
+
+
+@main.command()
 @click.argument("source_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
 @click.option(
     "-c",
