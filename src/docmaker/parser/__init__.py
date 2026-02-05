@@ -2,6 +2,15 @@
 
 from docmaker.parser.base import BaseParser
 from docmaker.parser.java_parser import JavaParser
+from docmaker.parser.python_parser import PythonParser
 from docmaker.parser.registry import ParserRegistry, get_parser
+from docmaker.parser.typescript_parser import TypeScriptParser
 
-__all__ = ["BaseParser", "JavaParser", "ParserRegistry", "get_parser"]
+__all__ = [
+    "BaseParser",
+    "JavaParser",
+    "PythonParser",
+    "TypeScriptParser",
+    "ParserRegistry",
+    "get_parser",
+]

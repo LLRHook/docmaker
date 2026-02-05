@@ -119,6 +119,14 @@ class MarkdownGenerator:
                     tags.append("entity")
                 elif ann.name == "Configuration":
                     tags.append("configuration")
+                elif ann.name == "interface":
+                    tags.append("interface")
+                elif ann.name == "dataclass":
+                    tags.append("dataclass")
+                elif ann.name == "Component":
+                    tags.append("component")
+                elif ann.name == "Injectable":
+                    tags.append("injectable")
 
         lines = [
             "---",
@@ -223,9 +231,10 @@ class MarkdownGenerator:
 
         if self.config.include_source_snippets:
             snippet = self._truncate_source(method.source_code)
+            lang = file_symbols.file.language.value
             lines.append("<details>")
             lines.append("<summary>Source Code</summary>\n")
-            lines.append("```java")
+            lines.append(f"```{lang}")
             lines.append(snippet)
             lines.append("```")
             lines.append("</details>\n")
@@ -265,9 +274,10 @@ class MarkdownGenerator:
 
         if self.config.include_source_snippets:
             snippet = self._truncate_source(func.source_code)
+            lang = file_symbols.file.language.value
             lines.append("<details>")
             lines.append("<summary>Source Code</summary>\n")
-            lines.append("```java")
+            lines.append(f"```{lang}")
             lines.append(snippet)
             lines.append("```")
             lines.append("</details>\n")
@@ -353,9 +363,10 @@ class MarkdownGenerator:
 
         if self.config.include_source_snippets:
             snippet = self._truncate_source(endpoint.source_code)
+            lang = file_symbols.file.language.value
             lines.append("<details>")
             lines.append("<summary>Handler Source Code</summary>\n")
-            lines.append("```java")
+            lines.append(f"```{lang}")
             lines.append(snippet)
             lines.append("```")
             lines.append("</details>\n")

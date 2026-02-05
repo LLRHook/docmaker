@@ -1,76 +1,145 @@
-# Docmaker Configuration
-# Run `docmaker init` to generate this file with defaults
+# =============================================================================
+# DOCMAKER CONFIGURATION
+# =============================================================================
+# This file configures the docmaker code-to-documentation pipeline.
+# All paths are relative to this configuration file unless specified otherwise.
 
-# Path to the source code repository to analyze
+# Source directory to crawl (can be overridden via CLI)
 source_dir: "."
 
-# Cache file for incremental updates
+# Incremental cache file for tracking file changes
 cache_file: ".docmaker_cache.json"
 
-# LLM Configuration (for file classification)
+# -----------------------------------------------------------------------------
+# LLM CONFIGURATION - Optional file classification
+# -----------------------------------------------------------------------------
+# LLM-based classification categorizes files as BACKEND/FRONTEND/CONFIG/TEST/IGNORE
+# Disable this for faster generation or if you don't need smart classification.
+
 llm:
-  # Provider: "ollama", "lmstudio", "openai", "anthropic"
+  # Enable/disable LLM classification (use --no-llm flag to override)
+  enabled: true
+
+  # Provider options: ollama, lmstudio, openai, anthropic
   provider: "ollama"
 
-  # Model name (depends on provider)
-  model: "qwen3-vl:8b"
+  # Model name for the selected provider
+  # Examples:
+  #   ollama: llama3.2, qwen3-vl:8b, codellama, mistral
+  #   lmstudio: local model name
+  #   openai: gpt-4o-mini, gpt-4o, gpt-3.5-turbo
+  #   anthropic: claude-3-haiku-20240307, claude-3-sonnet-20240229
+  model: "qwen3-vl:4b"
 
-  # API base URL
-  # - Ollama: http://localhost:11434
-  # - LM Studio: http://localhost:1234/v1
-  # - OpenAI: https://api.openai.com/v1
+  # Base URL for the LLM API
+  # Ollama default: http://localhost:11434
+  # LM Studio default: http://localhost:1234/v1
   base_url: "http://localhost:11434"
 
-  # API key (required for OpenAI/Anthropic, optional for local)
+  # API key (required for OpenAI/Anthropic, can use environment variable)
+  # api_key: "${OPENAI_API_KEY}"
   api_key: null
 
   # Request timeout in seconds
   timeout: 30
 
-  # Set to false to skip LLM classification (faster, but less accurate)
-  enabled: true
-
-# Crawler Configuration
+# -----------------------------------------------------------------------------
+# CRAWLER CONFIGURATION - File discovery settings
+# -----------------------------------------------------------------------------
 crawler:
-  # Respect .gitignore patterns
+  # Respect .gitignore patterns when crawling
   respect_gitignore: true
 
-  # Additional patterns to ignore (gitignore syntax)
+  # Additional patterns to ignore (glob syntax)
   custom_ignore_patterns:
     - "*.test.java"
     - "*.spec.ts"
     - "**/test/**"
     - "**/tests/**"
     - "**/__tests__/**"
+    - "**/__pycache__/**"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/build/**"
+    - "**/.git/**"
+    - "**/vendor/**"
+    - "**/generated/**"
+    - "**/migrations/**"
 
   # File extensions to include
+  # Supported languages: Java, Python, TypeScript, JavaScript, Go, Kotlin
   include_extensions:
     - ".java"
     - ".py"
-    - ".go"
     - ".ts"
+    - ".tsx"
     - ".js"
+    - ".jsx"
+    - ".go"
     - ".kt"
+    - ".kts"
 
-  # Skip files larger than this (in KB)
+  # Maximum file size to process (in KB)
   max_file_size_kb: 500
 
-  # Number of lines to read for LLM classification
+  # Number of lines from file header to send for LLM classification
   header_lines_for_classification: 50
 
-# Output Configuration
+# -----------------------------------------------------------------------------
+# OUTPUT CONFIGURATION - Documentation generation settings
+# -----------------------------------------------------------------------------
 output:
-  # Directory for generated Obsidian vault
+  # Output directory for generated documentation
   output_dir: "./docs"
 
-  # Mirror the source directory structure
+  # Mirror the source directory structure in output
+  # true: docs/src/services/UserService.md
+  # false: docs/UserService.md
   mirror_source_structure: true
 
   # Include source code snippets in documentation
   include_source_snippets: true
 
-  # Maximum lines per code snippet
+  # Maximum lines for source code snippets
   max_snippet_lines: 50
 
-  # Generate an index file with all documented items
+  # Generate index.md and endpoints.md files
   generate_index: true
+
+# =============================================================================
+# PROVIDER CONFIGURATION EXAMPLES
+# =============================================================================
+# Below are example configurations for different LLM providers.
+# Copy the relevant section and replace the llm: block above.
+
+# --- Ollama (Local) ---
+# llm:
+#   enabled: true
+#   provider: "ollama"
+#   model: "llama3.2"
+#   base_url: "http://localhost:11434"
+#   timeout: 30
+
+# --- LM Studio (Local) ---
+# llm:
+#   enabled: true
+#   provider: "lmstudio"
+#   model: "local-model"
+#   base_url: "http://localhost:1234/v1"
+#   timeout: 30
+
+# --- OpenAI (Cloud) ---
+# llm:
+#   enabled: true
+#   provider: "openai"
+#   model: "gpt-4o-mini"
+#   api_key: "${OPENAI_API_KEY}"
+#   timeout: 30
+
+# --- Anthropic (Cloud) ---
+# llm:
+#   enabled: true
+#   provider: "anthropic"
+#   model: "claude-3-haiku-20240307"
+#   api_key: "${ANTHROPIC_API_KEY}"
+#   timeout: 30
