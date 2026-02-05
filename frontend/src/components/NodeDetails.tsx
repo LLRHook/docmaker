@@ -1,6 +1,59 @@
-import { useEffect, useState, useCallback } from "react";
-import type { GraphNode, ClassDetails, EndpointDetails } from "../types/graph";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import type { GraphNode, ClassDetails, EndpointDetails, FieldInfo, CategorizedParameter, ParameterCategory } from "../types/graph";
 import { usePyloid } from "../hooks/usePyloid";
+
+function getDefaultForType(javaType: string): unknown {
+  const normalized = javaType.trim();
+
+  if (/^(String|CharSequence)$/i.test(normalized)) return "string";
+  if (/^(int|Integer|short|Short|byte|Byte)$/i.test(normalized)) return 0;
+  if (/^(long|Long)$/i.test(normalized)) return 0;
+  if (/^(double|Double|float|Float|BigDecimal)$/i.test(normalized)) return 0.0;
+  if (/^(boolean|Boolean)$/i.test(normalized)) return false;
+  if (/^LocalDate$/i.test(normalized)) return "2024-01-01";
+  if (/^(LocalDateTime|ZonedDateTime|Instant)$/i.test(normalized)) return "2024-01-01T00:00:00Z";
+  if (/^UUID$/i.test(normalized)) return "00000000-0000-0000-0000-000000000000";
+
+  const listMatch = normalized.match(/^(?:List|Set|Collection)<(.+)>$/);
+  if (listMatch) return [getDefaultForType(listMatch[1])];
+
+  const mapMatch = normalized.match(/^Map<(.+),\s*(.+)>$/);
+  if (mapMatch) return {};
+
+  return {};
+}
+
+function buildSampleJson(fields: FieldInfo[]): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const field of fields) {
+    if (field.modifiers.includes("static")) continue;
+    result[field.name] = getDefaultForType(field.type || "Object");
+  }
+  return result;
+}
+
+function categorizeParameter(param: { name: string; type: string | null; description: string | null }): CategorizedParameter {
+  const desc = param.description || "";
+  let category: ParameterCategory = "query";
+
+  if (desc.includes("@PathVariable")) category = "path";
+  else if (desc.includes("@RequestParam")) category = "query";
+  else if (desc.includes("@RequestBody")) category = "body";
+  else if (desc.includes("@RequestHeader")) category = "header";
+
+  return { name: param.name, type: param.type, description: param.description, category };
+}
+
+function methodBgColor(method: string): string {
+  const colors: Record<string, string> = {
+    GET: "bg-green-900/40 border-green-600/50",
+    POST: "bg-blue-900/40 border-blue-600/50",
+    PUT: "bg-amber-900/40 border-amber-600/50",
+    PATCH: "bg-amber-900/40 border-amber-600/50",
+    DELETE: "bg-red-900/40 border-red-600/50",
+  };
+  return colors[method.toUpperCase()] || "bg-gray-900/40 border-gray-600/50";
+}
 
 interface NodeDetailsProps {
   node: GraphNode | null;
@@ -23,6 +76,8 @@ export function NodeDetails({
 }: NodeDetailsProps) {
   const [classDetails, setClassDetails] = useState<ClassDetails | null>(null);
   const [endpointDetails, setEndpointDetails] = useState<EndpointDetails | null>(null);
+  const [requestBodyDetails, setRequestBodyDetails] = useState<ClassDetails | null>(null);
+  const [responseTypeDetails, setResponseTypeDetails] = useState<ClassDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const { getClassDetails, getEndpointDetails } = usePyloid();
 
@@ -60,6 +115,52 @@ export function NodeDetails({
 
     fetchDetails();
   }, [node, getClassDetails, getEndpointDetails]);
+
+  useEffect(() => {
+    setRequestBodyDetails(null);
+    setResponseTypeDetails(null);
+
+    if (!endpointDetails) return;
+
+    const fetchRelatedClasses = async () => {
+      const promises: Promise<void>[] = [];
+
+      if (endpointDetails.requestBody) {
+        promises.push(
+          getClassDetails(endpointDetails.requestBody)
+            .then((details) => { if (!details.error) setRequestBodyDetails(details); })
+            .catch(() => { /* ignore */ })
+        );
+      }
+
+      if (endpointDetails.responseType) {
+        promises.push(
+          getClassDetails(endpointDetails.responseType)
+            .then((details) => { if (!details.error) setResponseTypeDetails(details); })
+            .catch(() => { /* ignore */ })
+        );
+      }
+
+      await Promise.all(promises);
+    };
+
+    fetchRelatedClasses();
+  }, [endpointDetails, getClassDetails]);
+
+  const categorizedParams = useMemo(() => {
+    if (!endpointDetails) return { path: [], query: [], header: [], body: [] };
+
+    const grouped: Record<ParameterCategory, CategorizedParameter[]> = {
+      path: [], query: [], header: [], body: [],
+    };
+
+    for (const param of endpointDetails.parameters) {
+      const categorized = categorizeParameter(param);
+      grouped[categorized.category].push(categorized);
+    }
+
+    return grouped;
+  }, [endpointDetails]);
 
   // Find a node by name/fqn to enable navigation
   const findNodeByName = useCallback(
@@ -310,15 +411,16 @@ export function NodeDetails({
             {/* Endpoint-specific details */}
             {endpointDetails && (
               <>
-                <Section title="Endpoint">
-                  <div className="flex items-center gap-2 mb-2">
+                {/* Swagger-style banner */}
+                <div className={`rounded border p-3 mb-4 ${methodBgColor(endpointDetails.httpMethod)}`}>
+                  <div className="flex items-center gap-2">
                     <HttpMethodBadge method={endpointDetails.httpMethod} />
-                    <span className="text-sm text-gray-200 font-mono">{endpointDetails.path}</span>
+                    <span className="text-sm text-gray-100 font-mono font-medium">{endpointDetails.path}</span>
                   </div>
                   {endpointDetails.description && (
-                    <p className="text-sm text-gray-400">{endpointDetails.description}</p>
+                    <p className="text-sm text-gray-400 mt-2">{endpointDetails.description}</p>
                   )}
-                </Section>
+                </div>
 
                 <Section title="Handler">
                   <div className="text-sm">
@@ -329,31 +431,47 @@ export function NodeDetails({
                   </div>
                 </Section>
 
-                {endpointDetails.parameters.length > 0 && (
-                  <Section title="Parameters">
-                    <div className="space-y-1.5">
-                      {endpointDetails.parameters.map((param) => (
-                        <div key={param.name} className="text-sm flex items-baseline gap-1.5">
-                          <span className="text-gray-500 text-xs">
-                            {renderTypeLink(param.type || "?", "text-gray-500")}
-                          </span>
-                          <span className="text-gray-200">{param.name}</span>
-                          {param.description && (
-                            <span className="text-gray-600 text-xs">- {param.description}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                {categorizedParams.path.length > 0 && (
+                  <Section title="Path Parameters">
+                    <ParameterTable params={categorizedParams.path} renderTypeLink={renderTypeLink} />
+                  </Section>
+                )}
+
+                {categorizedParams.query.length > 0 && (
+                  <Section title="Query Parameters">
+                    <ParameterTable params={categorizedParams.query} renderTypeLink={renderTypeLink} />
+                  </Section>
+                )}
+
+                {categorizedParams.header.length > 0 && (
+                  <Section title="Header Parameters">
+                    <ParameterTable params={categorizedParams.header} renderTypeLink={renderTypeLink} />
+                  </Section>
+                )}
+
+                {endpointDetails.requestBody && (
+                  <Section title="Request Body" collapsible defaultOpen>
+                    <SampleJsonBlock
+                      typeName={endpointDetails.requestBody}
+                      classDetails={requestBodyDetails}
+                      renderTypeLink={renderTypeLink}
+                    />
                   </Section>
                 )}
 
                 {endpointDetails.responseType && (
-                  <Section title="Response">
-                    <div className="text-sm">
-                      {renderTypeLink(endpointDetails.responseType, "text-gray-300")}
-                    </div>
+                  <Section title="Response" collapsible defaultOpen>
+                    <SampleJsonBlock
+                      typeName={endpointDetails.responseType}
+                      classDetails={responseTypeDetails}
+                      renderTypeLink={renderTypeLink}
+                    />
                   </Section>
                 )}
+
+                <Section title="Example Request" collapsible defaultOpen={false}>
+                  <ExampleRequestBlock endpoint={endpointDetails} requestBodyDetails={requestBodyDetails} />
+                </Section>
               </>
             )}
           </>
@@ -479,5 +597,97 @@ function Section({ title, children, collapsible = false, defaultOpen = true }: S
       )}
       {(!collapsible || isOpen) && <div className="space-y-1.5">{children}</div>}
     </div>
+  );
+}
+
+function stripAnnotationPrefix(description: string | null): string {
+  if (!description) return "";
+  return description.replace(/^@\w+\s*/, "");
+}
+
+function ParameterTable({
+  params,
+  renderTypeLink,
+}: {
+  params: CategorizedParameter[];
+  renderTypeLink: (typeName: string, className?: string) => React.ReactNode;
+}) {
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="text-xs text-gray-500 border-b border-gray-700">
+          <th className="text-left py-1 pr-2 font-medium">Name</th>
+          <th className="text-left py-1 pr-2 font-medium">Type</th>
+          <th className="text-left py-1 font-medium">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {params.map((param) => (
+          <tr key={param.name} className="border-b border-gray-700/50">
+            <td className="py-1.5 pr-2 text-gray-200 font-mono text-xs">{param.name}</td>
+            <td className="py-1.5 pr-2 text-gray-400 text-xs">
+              {renderTypeLink(param.type || "?", "text-gray-400")}
+            </td>
+            <td className="py-1.5 text-gray-500 text-xs">{stripAnnotationPrefix(param.description)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function SampleJsonBlock({
+  typeName,
+  classDetails,
+  renderTypeLink,
+}: {
+  typeName: string;
+  classDetails: ClassDetails | null;
+  renderTypeLink: (typeName: string, className?: string) => React.ReactNode;
+}) {
+  const sampleJson = classDetails && classDetails.fields.length > 0
+    ? JSON.stringify(buildSampleJson(classDetails.fields), null, 2)
+    : null;
+
+  return (
+    <div>
+      <div className="text-sm mb-2">
+        {renderTypeLink(typeName, "text-blue-400")}
+      </div>
+      {sampleJson && (
+        <pre className="text-xs bg-gray-900 border border-gray-700 rounded p-2 overflow-x-auto text-gray-300">
+          {sampleJson}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function ExampleRequestBlock({
+  endpoint,
+  requestBodyDetails,
+}: {
+  endpoint: EndpointDetails;
+  requestBodyDetails: ClassDetails | null;
+}) {
+  const method = endpoint.httpMethod.toUpperCase();
+  const hasBody = ["POST", "PUT", "PATCH"].includes(method);
+  const bodyJson = hasBody && requestBodyDetails && requestBodyDetails.fields.length > 0
+    ? JSON.stringify(buildSampleJson(requestBodyDetails.fields), null, 2)
+    : null;
+
+  const lines = [`${method} ${endpoint.path}`];
+  if (hasBody) {
+    lines.push("Content-Type: application/json");
+  }
+  if (bodyJson) {
+    lines.push("");
+    lines.push(bodyJson);
+  }
+
+  return (
+    <pre className="text-xs bg-gray-900 border border-gray-700 rounded p-2 overflow-x-auto text-gray-300">
+      {lines.join("\n")}
+    </pre>
   );
 }
