@@ -93,12 +93,8 @@ def generate(
             cfg.llm.enabled = False
 
         pipeline = Pipeline(cfg, console)
-        generated = pipeline.run(incremental=incremental)
-
-        if generated:
-            sys.exit(0)
-        else:
-            sys.exit(0)
+        pipeline.run(incremental=incremental)
+        sys.exit(0)
 
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")

@@ -228,12 +228,3 @@ class FileCrawler:
                 files.append(source_file)
 
         return files
-
-    def crawl_with_filter(self, categories: list[FileCategory] | None = None) -> list[SourceFile]:
-        """Crawl and filter by categories."""
-        files = self.crawl()
-
-        if categories:
-            files = [f for f in files if f.category in categories]
-
-        return files
