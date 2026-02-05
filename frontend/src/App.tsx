@@ -3,7 +3,9 @@ import { GraphView } from "./components/GraphView";
 import { Sidebar, type FilterState } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { NodeDetails } from "./components/NodeDetails";
+import { SettingsModal } from "./components/settings";
 import { usePyloid } from "./hooks/usePyloid";
+import { useSettings } from "./contexts/SettingsContext";
 import type { CodeGraph, GraphNode } from "./types/graph";
 import { createLogger } from "./utils/logger";
 
@@ -27,10 +29,13 @@ export function App() {
   const [showOpenMenu, setShowOpenMenu] = useState(false);
   const [showPathInput, setShowPathInput] = useState(false);
   const [pathInputValue, setPathInputValue] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [detailsPanelCollapsed, setDetailsPanelCollapsed] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { isAvailable, selectFolder, parseOnly, openFile } = usePyloid();
+  const { settings, updateCategory } = useSettings();
 
   // Check if running in Pyloid (now reactive)
   const pyloidAvailable = isAvailable();
@@ -68,12 +73,15 @@ export function App() {
       });
       setStatus("ready");
       setStatusMessage(`Loaded ${result.stats.classesFound} classes, ${result.stats.endpointsFound} endpoints`);
+
+      // Save to lastProjectPath in settings
+      updateCategory("general", { lastProjectPath: path });
     } catch (err) {
       logger.error("Exception loading project:", err);
       setStatus("error");
       setStatusMessage(err instanceof Error ? err.message : "Unknown error");
     }
-  }, [parseOnly]);
+  }, [parseOnly, updateCategory]);
 
   const handleBrowseFolder = useCallback(async () => {
     setShowOpenMenu(false);
@@ -138,6 +146,10 @@ export function App() {
     if (nodeId) {
       const node = graph.nodes.find((n) => n.id === nodeId);
       setDetailsNode(node || null);
+      // Auto-expand panel when selecting a node
+      if (node) {
+        setDetailsPanelCollapsed(false);
+      }
     } else {
       setDetailsNode(null);
     }
@@ -156,6 +168,20 @@ export function App() {
     setSelectedNodeId(null);
   }, []);
 
+  const handleToggleDetailsPanel = useCallback(() => {
+    setDetailsPanelCollapsed((prev) => !prev);
+  }, []);
+
+  // Navigate to a node in the graph (for clickable links in details panel)
+  const handleNavigateToNode = useCallback((nodeId: string) => {
+    const node = graph.nodes.find((n) => n.id === nodeId);
+    if (node) {
+      setSelectedNodeId(nodeId);
+      setDetailsNode(node);
+      setDetailsPanelCollapsed(false);
+    }
+  }, [graph.nodes]);
+
   const handleOpenFile = useCallback(async (path: string, line: number) => {
     await openFile(path, line);
   }, [openFile]);
@@ -172,6 +198,32 @@ export function App() {
       window.removeEventListener("load-project" as keyof WindowEventMap, handleLoadProjectEvent as EventListener);
     };
   }, [handleLoadProject]);
+
+  // Open last project on startup if enabled
+  useEffect(() => {
+    if (
+      settings.general.openLastProjectOnStartup &&
+      settings.general.lastProjectPath &&
+      !projectPath
+    ) {
+      handleLoadProject(settings.general.lastProjectPath);
+    }
+    // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keyboard shortcut: Ctrl+, to open settings
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+        e.preventDefault();
+        setShowSettings(true);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-gray-100">
@@ -251,6 +303,28 @@ export function App() {
           </div>
         )}
 
+        {/* Settings button */}
+        <button
+          onClick={() => setShowSettings(true)}
+          className="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded"
+          title="Settings (Ctrl+,)"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+          </svg>
+        </button>
+
         {!pyloidAvailable && (
           <span className="text-xs text-yellow-500 bg-yellow-900/30 px-2 py-1 rounded-sm">
             Dev Mode
@@ -278,13 +352,15 @@ export function App() {
         />
 
         {/* Details panel */}
-        {detailsNode && (
-          <NodeDetails
-            node={detailsNode}
-            onClose={handleCloseDetails}
-            onOpenFile={handleOpenFile}
-          />
-        )}
+        <NodeDetails
+          node={detailsNode}
+          isCollapsed={detailsPanelCollapsed}
+          onToggleCollapse={handleToggleDetailsPanel}
+          onClose={handleCloseDetails}
+          onOpenFile={handleOpenFile}
+          onNavigateToNode={handleNavigateToNode}
+          allNodes={graph.nodes}
+        />
       </div>
 
       {/* Status bar */}
@@ -294,6 +370,9 @@ export function App() {
         status={status}
         message={statusMessage}
       />
+
+      {/* Settings modal */}
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   );
 }
