@@ -48,6 +48,12 @@ dev = [
     "pytest-cov>=4.1.0",
     "ruff>=0.3.0",
 ]
+build = [
+    "pyinstaller>=6.0.0",
+    "pillow>=10.0.0",
+    "svglib>=1.5.0",
+    "reportlab>=4.0.0",
+]
 
 [project.scripts]
 docmaker = "docmaker.cli:main"

@@ -10,8 +10,24 @@ from docmaker.app.ipc import DocmakerAPI
 
 logger = logging.getLogger(__name__)
 
+
+def get_frontend_dir() -> Path:
+    """Get the frontend directory path.
+
+    Handles both development mode and PyInstaller frozen mode.
+
+    Returns:
+        Path to the frontend dist directory
+    """
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        # Running as PyInstaller bundle
+        return Path(sys._MEIPASS) / "frontend"
+    # Development mode
+    return Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
+
+
 # Get the frontend directory path
-FRONTEND_DIR = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
+FRONTEND_DIR = get_frontend_dir()
 DEV_URL = "http://localhost:5173"
 
 

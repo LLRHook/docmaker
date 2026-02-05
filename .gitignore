@@ -58,3 +58,9 @@ ENV/
 *.whl
 .claude/settings.local.json
 CLAUDE.md
+
+# PyInstaller
+*.spec.bak
+packaging/icons/*.ico
+packaging/icons/*.icns
+packaging/icons/*.png
