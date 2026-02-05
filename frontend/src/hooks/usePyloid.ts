@@ -267,6 +267,38 @@ export function usePyloid() {
     }
   }, []);
 
+  const resizeWindow = useCallback(async (width: number, height: number): Promise<{ success: boolean; error?: string }> => {
+    logger.debug("resizeWindow called:", width, height);
+    try {
+      const result = await ipc.DocmakerAPI.resize_window(width, height);
+      const parsed = JSON.parse(result);
+      if (parsed.error) {
+        logger.error("resizeWindow error:", parsed.error);
+      } else {
+        logger.info("Window resized to:", width, height);
+      }
+      return parsed;
+    } catch (error) {
+      logger.error("resizeWindow failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }, []);
+
+  const getWindowSize = useCallback(async (): Promise<{ width: number; height: number; error?: string }> => {
+    logger.debug("getWindowSize called");
+    try {
+      const result = await ipc.DocmakerAPI.get_window_size();
+      const parsed = JSON.parse(result);
+      if (parsed.error) {
+        logger.error("getWindowSize error:", parsed.error);
+      }
+      return parsed;
+    } catch (error) {
+      logger.error("getWindowSize failed:", error);
+      return { width: 0, height: 0, error: String(error) };
+    }
+  }, []);
+
   return {
     isAvailable,
     selectFolder,
@@ -281,5 +313,7 @@ export function usePyloid() {
     getSettings,
     saveSettings,
     resetSettings,
+    resizeWindow,
+    getWindowSize,
   };
 }

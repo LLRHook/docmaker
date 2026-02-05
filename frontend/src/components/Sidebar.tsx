@@ -103,7 +103,7 @@ export function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }:
   );
 
   return (
-    <div className="w-72 bg-gray-800 border-r border-gray-700 flex flex-col h-full">
+    <div className="w-full bg-gray-800 border-r border-gray-700 flex flex-col h-full">
       {/* Search */}
       <div className="p-3 border-b border-gray-700">
         <input

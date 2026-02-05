@@ -4,8 +4,9 @@ import { GraphSettings } from "./GraphSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { EditorSettings } from "./EditorSettings";
 import { GeneralSettings } from "./GeneralSettings";
+import { LayoutSettings } from "./LayoutSettings";
 
-type SettingsTab = "graphView" | "appearance" | "editor" | "general";
+type SettingsTab = "graphView" | "appearance" | "layout" | "editor" | "general";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -37,6 +38,20 @@ const TAB_CONFIG: { id: SettingsTab; label: string; icon: React.ReactNode }[] = 
           strokeLinejoin="round"
           strokeWidth={1.5}
           d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+        />
+      </svg>
+    ),
+  },
+  {
+    id: "layout",
+    label: "Layout",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
         />
       </svg>
     ),
@@ -122,6 +137,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         return <GraphSettings />;
       case "appearance":
         return <AppearanceSettings />;
+      case "layout":
+        return <LayoutSettings />;
       case "editor":
         return <EditorSettings />;
       case "general":

@@ -28,6 +28,8 @@ vi.mock("pyloid-js", () => ({
       parse_only: vi.fn().mockResolvedValue('{"graph":{"nodes":[],"edges":[]},"stats":{"filesParsed":0,"classesFound":0,"endpointsFound":0}}'),
       select_folder: vi.fn().mockResolvedValue(null),
       open_file: vi.fn().mockResolvedValue("{}"),
+      resize_window: vi.fn().mockResolvedValue('{"success":true}'),
+      get_window_size: vi.fn().mockResolvedValue('{"width":1280,"height":720}'),
     },
   },
   pyloidReadyManager: {

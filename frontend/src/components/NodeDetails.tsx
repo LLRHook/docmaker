@@ -125,7 +125,7 @@ export function NodeDetails({
   // No node selected - show empty state with collapse button
   if (!node) {
     return (
-      <div className="w-80 bg-gray-800 border-l border-gray-700 flex flex-col h-full relative">
+      <div className="w-full bg-gray-800 border-l border-gray-700 flex flex-col h-full relative">
         {/* Collapse toggle on edge */}
         <button
           onClick={onToggleCollapse}
@@ -161,7 +161,7 @@ export function NodeDetails({
   }
 
   return (
-    <div className="w-80 bg-gray-800 border-l border-gray-700 flex flex-col h-full relative">
+    <div className="w-full bg-gray-800 border-l border-gray-700 flex flex-col h-full relative">
       {/* Collapse toggle on edge */}
       <button
         onClick={onToggleCollapse}
