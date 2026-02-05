@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    { name = "Victor" }
+    { name = "Victor", email = "victor.n.ivanov@gmail.com" }
 ]
 keywords = ["documentation", "obsidian", "code-analysis", "api-docs"]
 classifiers = [
