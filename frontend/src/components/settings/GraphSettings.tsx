@@ -1,5 +1,10 @@
 import { useSettings } from "../../contexts/SettingsContext";
 import type { GraphViewSettings } from "../../types/settings";
+import {
+  LAYOUT_LABELS,
+  LAYOUT_QUALITY_LABELS,
+  NODE_SIZING_LABELS,
+} from "../../types/settings";
 
 export function GraphSettings() {
   const { settings, updateCategory } = useSettings();
@@ -23,6 +28,18 @@ export function GraphSettings() {
 
   const handleShowLabelsChange = (value: boolean) => {
     updateCategory("graphView", { showLabels: value });
+  };
+
+  const handleLayoutQualityChange = (value: GraphViewSettings["layoutQuality"]) => {
+    updateCategory("graphView", { layoutQuality: value });
+  };
+
+  const handleNodeSizingChange = (value: GraphViewSettings["nodeSizing"]) => {
+    updateCategory("graphView", { nodeSizing: value });
+  };
+
+  const handleLargeGraphThresholdChange = (value: number) => {
+    updateCategory("graphView", { largeGraphThreshold: value });
   };
 
   return (
@@ -87,10 +104,82 @@ export function GraphSettings() {
           }
           className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 focus:outline-none focus:border-blue-500"
         >
-          <option value="cose">Force-directed (CoSE)</option>
-          <option value="circle">Circular</option>
-          <option value="grid">Grid</option>
+          {Object.entries(LAYOUT_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
+      </div>
+
+      {/* Layout Quality */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Layout Quality
+        </label>
+        <select
+          value={graphView.layoutQuality}
+          onChange={(e) =>
+            handleLayoutQualityChange(e.target.value as GraphViewSettings["layoutQuality"])
+          }
+          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+        >
+          {Object.entries(LAYOUT_QUALITY_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          Higher quality produces better layouts but takes longer
+        </p>
+      </div>
+
+      {/* Node Sizing */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Node Sizing
+        </label>
+        <select
+          value={graphView.nodeSizing}
+          onChange={(e) =>
+            handleNodeSizingChange(e.target.value as GraphViewSettings["nodeSizing"])
+          }
+          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+        >
+          {Object.entries(NODE_SIZING_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          Nodes with more connections appear larger when using "By Connection Count"
+        </p>
+      </div>
+
+      {/* Large Graph Threshold */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Large Graph Threshold
+        </label>
+        <div className="flex items-center gap-4">
+          <input
+            type="range"
+            min="50"
+            max="500"
+            step="25"
+            value={graphView.largeGraphThreshold}
+            onChange={(e) => handleLargeGraphThresholdChange(parseInt(e.target.value))}
+            className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+          />
+          <span className="w-16 text-sm text-gray-400 text-right">
+            {graphView.largeGraphThreshold} nodes
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Animations are disabled for graphs larger than this threshold
+        </p>
       </div>
 
       {/* Animation Speed */}

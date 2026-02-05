@@ -1,10 +1,15 @@
 import { useRef, useEffect, useCallback, useMemo } from "react";
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
+import fcose from "cytoscape-fcose";
 import type { CodeGraph, GraphNode } from "../types/graph";
 import type { FilterState } from "./Sidebar";
 import { useSettings } from "../contexts/SettingsContext";
+import type { GraphViewSettings } from "../types/settings";
 import { ANIMATION_DURATION } from "../types/settings";
+
+// Register fCOSE extension
+cytoscape.use(fcose);
 
 type Core = cytoscape.Core;
 type EventObject = cytoscape.EventObject;
@@ -24,7 +29,7 @@ interface GraphViewProps {
   onNodeDoubleClick: (node: GraphNode) => void;
 }
 
-export type LayoutName = "cose" | "dagre" | "circle" | "grid";
+export type LayoutName = "fcose" | "cose" | "circle" | "grid";
 
 const NODE_COLORS: Record<string, string> = {
   class: "#3b82f6", // blue-500
@@ -130,6 +135,17 @@ export function GraphView({
   const { settings } = useSettings();
   const graphSettings = settings.graphView;
 
+  // Calculate node degrees (connection count) for sizing
+  const nodeDegrees = useMemo(() => {
+    const degrees = new Map<string, number>();
+    graph.nodes.forEach((node) => degrees.set(node.id, 0));
+    graph.edges.forEach((edge) => {
+      degrees.set(edge.source, (degrees.get(edge.source) || 0) + 1);
+      degrees.set(edge.target, (degrees.get(edge.target) || 0) + 1);
+    });
+    return degrees;
+  }, [graph]);
+
   // Convert graph data to Cytoscape elements
   const elements = useMemo(() => {
     const nodeElements = graph.nodes
@@ -152,7 +168,7 @@ export function GraphView({
           label: node.label,
           color: NODE_COLORS[node.type] || "#6b7280",
           shape: NODE_SHAPES[node.type] || "ellipse",
-          size: getNodeSize(node),
+          size: getNodeSize(node, graphSettings.nodeSizing, nodeDegrees.get(node.id) || 0),
           nodeType: node.type,
           ...node.metadata,
         },
@@ -163,11 +179,12 @@ export function GraphView({
 
     const edgeElements = graph.edges
       .filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
-      .map((edge, index) => {
+      .map((edge) => {
         const style = EDGE_STYLES[edge.type] || DEFAULT_EDGE_STYLE;
         return {
           data: {
-            id: `edge-${index}`,
+            // Stable edge ID based on content, not index
+            id: `${edge.source}-${edge.type}-${edge.target}`,
             source: edge.source,
             target: edge.target,
             edgeType: edge.type,
@@ -177,7 +194,7 @@ export function GraphView({
       });
 
     return [...nodeElements, ...edgeElements];
-  }, [graph, filters]);
+  }, [graph, filters, graphSettings.nodeSizing, nodeDegrees]);
 
   // Handle node selection highlighting
   useEffect(() => {
@@ -216,9 +233,17 @@ export function GraphView({
     // Run layout with animation settings
     const animationDuration = ANIMATION_DURATION[graphSettings.animationSpeed];
     const layoutName = graphSettings.defaultLayout;
-    const layout = cy.layout(getLayoutOptions(layoutName, elements.length, animationDuration));
+    const nodeCount = graph.nodes.length;
+    const layout = cy.layout(
+      getLayoutOptions(layoutName, {
+        nodeCount,
+        animationDuration,
+        quality: graphSettings.layoutQuality,
+        largeGraphThreshold: graphSettings.largeGraphThreshold,
+      })
+    );
     layout.run();
-  }, [elements, graphSettings.animationSpeed, graphSettings.defaultLayout]);
+  }, [elements, graphSettings.animationSpeed, graphSettings.defaultLayout, graphSettings.layoutQuality, graphSettings.largeGraphThreshold, graph.nodes.length]);
 
   const handleCyInit = useCallback((cy: Core) => {
     cyRef.current = cy;
@@ -260,9 +285,17 @@ export function GraphView({
     if (!cy) return;
 
     const animationDuration = ANIMATION_DURATION[graphSettings.animationSpeed];
-    const layout = cy.layout(getLayoutOptions(layoutName, elements.length, animationDuration));
+    const nodeCount = graph.nodes.length;
+    const layout = cy.layout(
+      getLayoutOptions(layoutName, {
+        nodeCount,
+        animationDuration,
+        quality: graphSettings.layoutQuality,
+        largeGraphThreshold: graphSettings.largeGraphThreshold,
+      })
+    );
     layout.run();
-  }, [elements.length, graphSettings.animationSpeed]);
+  }, [graph.nodes.length, graphSettings.animationSpeed, graphSettings.layoutQuality, graphSettings.largeGraphThreshold]);
 
   const handleFitGraph = useCallback(() => {
     const cy = cyRef.current;
@@ -288,9 +321,9 @@ export function GraphView({
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <div className="bg-gray-800 rounded-lg shadow-lg flex">
           <button
-            onClick={() => handleLayout("cose")}
+            onClick={() => handleLayout("fcose")}
             className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-l-lg"
-            title="Force-directed layout"
+            title="Force-directed layout (fCoSE)"
           >
             Force
           </button>
@@ -398,33 +431,77 @@ export function GraphView({
   );
 }
 
-function getNodeSize(node: GraphNode): number {
-  switch (node.type) {
-    case "package":
-      return 50;
-    case "class":
-    case "interface": {
-      // Size based on method count if available
-      const methodCount = node.metadata.methodCount || 0;
-      return Math.min(60, Math.max(30, 30 + methodCount * 2));
-    }
-    case "endpoint":
-      return 25;
-    case "file":
-      return 20;
+function getNodeSize(
+  node: GraphNode,
+  sizingMode: GraphViewSettings["nodeSizing"],
+  degree: number
+): number {
+  const BASE = 30;
+  const MIN = 20;
+  const MAX = 80;
+
+  switch (sizingMode) {
+    case "fixed":
+      return BASE;
+    case "byType":
+      // Original type-based sizing
+      switch (node.type) {
+        case "package":
+          return 50;
+        case "class":
+        case "interface": {
+          const methodCount = node.metadata.methodCount || 0;
+          return Math.min(60, Math.max(30, 30 + methodCount * 2));
+        }
+        case "endpoint":
+          return 25;
+        case "file":
+          return 20;
+        default:
+          return 30;
+      }
+    case "byDegree":
+      // Logarithmic scale based on connections
+      return Math.min(MAX, Math.max(MIN, BASE + Math.log2(degree + 1) * 8));
     default:
-      return 30;
+      return BASE;
   }
 }
 
-function getLayoutOptions(name: LayoutName, nodeCount: number, animationDuration = 300): LayoutOptions {
+interface LayoutConfig {
+  nodeCount: number;
+  animationDuration: number;
+  quality: GraphViewSettings["layoutQuality"];
+  largeGraphThreshold: number;
+}
+
+function getLayoutOptions(name: LayoutName, config: LayoutConfig): LayoutOptions {
+  const isLarge = config.nodeCount > config.largeGraphThreshold;
+  const shouldAnimate = config.animationDuration > 0 && !isLarge;
+
   const baseOptions = {
     name,
-    animate: animationDuration > 0 && nodeCount < 100,
-    animationDuration,
+    animate: shouldAnimate,
+    animationDuration: shouldAnimate ? config.animationDuration : 0,
   };
 
   switch (name) {
+    case "fcose":
+      return {
+        ...baseOptions,
+        name: "fcose",
+        quality: config.quality,
+        fit: true,
+        padding: 30,
+        nodeSeparation: 100,
+        nodeRepulsion: () => 4500,
+        idealEdgeLength: () => 80,
+        edgeElasticity: () => 0.45,
+        gravity: 0.25,
+        numIter: isLarge ? 500 : 2500,
+        randomize: true,
+        tile: true,
+      } as LayoutOptions;
     case "cose":
       return {
         ...baseOptions,
@@ -440,7 +517,7 @@ function getLayoutOptions(name: LayoutName, nodeCount: number, animationDuration
         edgeElasticity: 100,
         nestingFactor: 5,
         gravity: 80,
-        numIter: 1000,
+        numIter: isLarge ? 200 : 500,
         initialTemp: 200,
         coolingFactor: 0.95,
         minTemp: 1.0,

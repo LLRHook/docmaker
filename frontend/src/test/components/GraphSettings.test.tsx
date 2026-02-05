@@ -30,9 +30,20 @@ describe("GraphSettings", () => {
     // Zoom Sensitivity control
     expect(screen.getByText("Zoom Sensitivity")).toBeInTheDocument();
 
-    // Default Layout dropdown
+    // Default Layout dropdown (now defaults to fcose)
     expect(screen.getByText("Default Layout")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Force-directed (CoSE)")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Force-directed (fCoSE - recommended)")).toBeInTheDocument();
+
+    // Layout Quality dropdown
+    expect(screen.getByText("Layout Quality")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Balanced")).toBeInTheDocument();
+
+    // Node Sizing dropdown
+    expect(screen.getByText("Node Sizing")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("By Connection Count")).toBeInTheDocument();
+
+    // Large Graph Threshold slider
+    expect(screen.getByText("Large Graph Threshold")).toBeInTheDocument();
 
     // Animation Speed dropdown
     expect(screen.getByText("Animation Speed")).toBeInTheDocument();
@@ -42,13 +53,13 @@ describe("GraphSettings", () => {
     expect(screen.getByText("Show Node Labels")).toBeInTheDocument();
     expect(screen.getByLabelText("Show Node Labels")).toBeChecked();
 
-    // Verify there are 2 sliders (scroll speed and zoom sensitivity)
+    // Verify there are 3 sliders (scroll speed, zoom sensitivity, large graph threshold)
     const sliders = screen.getAllByRole("slider");
-    expect(sliders).toHaveLength(2);
+    expect(sliders).toHaveLength(3);
 
-    // Verify there are 2 comboboxes (layout and animation)
+    // Verify there are 4 comboboxes (layout, layout quality, node sizing, animation)
     const comboboxes = screen.getAllByRole("combobox");
-    expect(comboboxes).toHaveLength(2);
+    expect(comboboxes).toHaveLength(4);
   });
 
   it("slider changes update scroll speed setting", async () => {
@@ -130,8 +141,8 @@ describe("GraphSettings", () => {
       expect(screen.getByText("Graph View Settings")).toBeInTheDocument();
     });
 
-    // Find the layout dropdown
-    const layoutSelect = screen.getByDisplayValue("Force-directed (CoSE)");
+    // Find the layout dropdown (now defaults to fcose)
+    const layoutSelect = screen.getByDisplayValue("Force-directed (fCoSE - recommended)");
 
     // Change to Circle layout
     await user.selectOptions(layoutSelect, "circle");

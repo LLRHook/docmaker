@@ -2,8 +2,11 @@ export interface GraphViewSettings {
   scrollSpeed: number;
   zoomSensitivity: number;
   animationSpeed: "none" | "fast" | "normal" | "slow";
-  defaultLayout: "cose" | "circle" | "grid";
+  defaultLayout: "fcose" | "cose" | "circle" | "grid";
   showLabels: boolean;
+  layoutQuality: "draft" | "default" | "proof";
+  nodeSizing: "fixed" | "byType" | "byDegree";
+  largeGraphThreshold: number;
 }
 
 export interface AppearanceSettings {
@@ -42,8 +45,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
     scrollSpeed: 0.3,
     zoomSensitivity: 0.2,
     animationSpeed: "normal",
-    defaultLayout: "cose",
+    defaultLayout: "fcose",
     showLabels: true,
+    layoutQuality: "default",
+    nodeSizing: "byDegree",
+    largeGraphThreshold: 200,
   },
   appearance: {
     fontSize: "medium",
@@ -104,4 +110,23 @@ export const FONT_SIZE_LABELS: Record<AppearanceSettings["fontSize"], string> = 
   small: "Small",
   medium: "Medium",
   large: "Large",
+};
+
+export const LAYOUT_LABELS: Record<GraphViewSettings["defaultLayout"], string> = {
+  fcose: "Force-directed (fCoSE - recommended)",
+  cose: "Force-directed (CoSE)",
+  circle: "Circular",
+  grid: "Grid",
+};
+
+export const LAYOUT_QUALITY_LABELS: Record<GraphViewSettings["layoutQuality"], string> = {
+  draft: "Draft (fastest)",
+  default: "Balanced",
+  proof: "High Quality (slowest)",
+};
+
+export const NODE_SIZING_LABELS: Record<GraphViewSettings["nodeSizing"], string> = {
+  fixed: "Fixed Size",
+  byType: "By Node Type",
+  byDegree: "By Connection Count",
 };
