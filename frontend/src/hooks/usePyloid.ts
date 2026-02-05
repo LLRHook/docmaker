@@ -222,6 +222,51 @@ export function usePyloid() {
     }
   }, []);
 
+  const getSettings = useCallback(async (): Promise<Record<string, unknown>> => {
+    logger.debug("getSettings called");
+    try {
+      const result = await ipc.DocmakerAPI.get_settings();
+      const parsed = JSON.parse(result);
+      if (parsed.error) {
+        logger.error("getSettings error:", parsed.error);
+      }
+      return parsed;
+    } catch (error) {
+      logger.error("getSettings failed:", error);
+      return { error: String(error) };
+    }
+  }, []);
+
+  const saveSettings = useCallback(async (settings: Record<string, unknown>): Promise<{ success: boolean; error?: string }> => {
+    logger.debug("saveSettings called");
+    try {
+      const result = await ipc.DocmakerAPI.save_settings_ipc(JSON.stringify(settings));
+      const parsed = JSON.parse(result);
+      if (parsed.error) {
+        logger.error("saveSettings error:", parsed.error);
+      }
+      return parsed;
+    } catch (error) {
+      logger.error("saveSettings failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }, []);
+
+  const resetSettings = useCallback(async (): Promise<Record<string, unknown>> => {
+    logger.debug("resetSettings called");
+    try {
+      const result = await ipc.DocmakerAPI.reset_settings_ipc();
+      const parsed = JSON.parse(result);
+      if (parsed.error) {
+        logger.error("resetSettings error:", parsed.error);
+      }
+      return parsed;
+    } catch (error) {
+      logger.error("resetSettings failed:", error);
+      return { error: String(error) };
+    }
+  }, []);
+
   return {
     isAvailable,
     selectFolder,
@@ -233,5 +278,8 @@ export function usePyloid() {
     getProjectInfo,
     getClassDetails,
     getEndpointDetails,
+    getSettings,
+    saveSettings,
+    resetSettings,
   };
 }

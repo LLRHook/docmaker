@@ -10,6 +10,12 @@ from pyloid.ipc import Bridge, PyloidIPC
 from PySide6.QtWidgets import QFileDialog
 
 from docmaker.app.graph_builder import GraphBuilder
+from docmaker.app.settings import (
+    get_editor_command,
+    load_settings,
+    reset_settings,
+    save_settings,
+)
 from docmaker.config import DocmakerConfig
 from docmaker.crawler import FileCrawler
 from docmaker.models import FileCategory, SourceFile, SymbolTable
@@ -279,31 +285,88 @@ class DocmakerAPI(PyloidIPC):
 
     @Bridge(str, int, result=str)
     def open_file(self, path: str, line: int) -> str:
-        """Open a file in the default editor.
+        """Open a file in the configured editor.
 
         Args:
             path: Path to the file
             line: Line number to jump to (0 for beginning)
 
         Returns:
-            JSON string with success status
+            JSON string with success status and editor used
         """
         try:
             file_path = Path(path)
             if not file_path.exists():
                 return json.dumps({"error": f"File does not exist: {path}"})
 
-            # Try to open with VS Code first (most common for developers)
-            try:
-                if line > 0:
-                    subprocess.Popen(["code", "--goto", f"{path}:{line}"])
-                else:
-                    subprocess.Popen(["code", path])
-                return json.dumps({"success": True, "editor": "vscode"})
-            except FileNotFoundError:
-                pass
+            settings = load_settings()
+            cmd_template, editor_type = get_editor_command(settings)
 
-            # Fall back to system default
+            # If alwaysAsk is true, signal frontend to show picker
+            if editor_type == "ask":
+                return json.dumps({"success": False, "askUser": True})
+
+            # Handle auto-detect: try VS Code first, then system default
+            if editor_type == "auto":
+                try:
+                    if line > 0:
+                        subprocess.Popen(["code", "--goto", f"{path}:{line}"])
+                    else:
+                        subprocess.Popen(["code", path])
+                    return json.dumps({"success": True, "editor": "vscode"})
+                except FileNotFoundError:
+                    # Fall through to system default
+                    editor_type = "system"
+
+            # Handle custom command with placeholders
+            if cmd_template and editor_type == "custom":
+                cmd = []
+                for part in cmd_template:
+                    part = part.replace("{file}", path)
+                    part = part.replace("{line}", str(line if line > 0 else 1))
+                    cmd.append(part)
+                try:
+                    subprocess.Popen(cmd)
+                    return json.dumps({"success": True, "editor": "custom"})
+                except FileNotFoundError:
+                    logger.warning("Custom editor command not found: %s", cmd[0])
+                    editor_type = "system"
+
+            # Handle specific editors
+            if editor_type == "vscode":
+                try:
+                    if line > 0:
+                        subprocess.Popen(["code", "--goto", f"{path}:{line}"])
+                    else:
+                        subprocess.Popen(["code", path])
+                    return json.dumps({"success": True, "editor": "vscode"})
+                except FileNotFoundError:
+                    logger.warning("VS Code not found, falling back to system")
+                    editor_type = "system"
+
+            elif editor_type == "idea":
+                try:
+                    if line > 0:
+                        subprocess.Popen(["idea", "--line", str(line), path])
+                    else:
+                        subprocess.Popen(["idea", path])
+                    return json.dumps({"success": True, "editor": "idea"})
+                except FileNotFoundError:
+                    logger.warning("IntelliJ IDEA not found, falling back to system")
+                    editor_type = "system"
+
+            elif editor_type == "sublime":
+                try:
+                    if line > 0:
+                        subprocess.Popen(["subl", f"{path}:{line}"])
+                    else:
+                        subprocess.Popen(["subl", path])
+                    return json.dumps({"success": True, "editor": "sublime"})
+                except FileNotFoundError:
+                    logger.warning("Sublime Text not found, falling back to system")
+                    editor_type = "system"
+
+            # System default fallback
             if sys.platform == "win32":
                 import os
 
@@ -440,4 +503,50 @@ class DocmakerAPI(PyloidIPC):
 
         except Exception as e:
             logger.exception("Error getting endpoint details")
+            return json.dumps({"error": str(e)})
+
+    @Bridge(result=str)
+    def get_settings(self) -> str:
+        """Load and return all settings as JSON.
+
+        Returns:
+            JSON string with current settings
+        """
+        try:
+            settings = load_settings()
+            return json.dumps(settings)
+        except Exception as e:
+            logger.exception("Error loading settings")
+            return json.dumps({"error": str(e)})
+
+    @Bridge(str, result=str)
+    def save_settings_ipc(self, settings_json: str) -> str:
+        """Save settings from JSON string.
+
+        Args:
+            settings_json: JSON string with settings to save
+
+        Returns:
+            JSON string with success status
+        """
+        try:
+            settings = json.loads(settings_json)
+            save_settings(settings)
+            return json.dumps({"success": True})
+        except Exception as e:
+            logger.exception("Error saving settings")
+            return json.dumps({"error": str(e)})
+
+    @Bridge(result=str)
+    def reset_settings_ipc(self) -> str:
+        """Reset all settings to defaults.
+
+        Returns:
+            JSON string with default settings
+        """
+        try:
+            defaults = reset_settings()
+            return json.dumps(defaults)
+        except Exception as e:
+            logger.exception("Error resetting settings")
             return json.dumps({"error": str(e)})

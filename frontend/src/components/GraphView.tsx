@@ -3,6 +3,8 @@ import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
 import type { CodeGraph, GraphNode } from "../types/graph";
 import type { FilterState } from "./Sidebar";
+import { useSettings } from "../contexts/SettingsContext";
+import { ANIMATION_DURATION } from "../types/settings";
 
 type Core = cytoscape.Core;
 type EventObject = cytoscape.EventObject;
@@ -22,7 +24,7 @@ interface GraphViewProps {
   onNodeDoubleClick: (node: GraphNode) => void;
 }
 
-type LayoutName = "cose" | "dagre" | "circle" | "grid";
+export type LayoutName = "cose" | "dagre" | "circle" | "grid";
 
 const NODE_COLORS: Record<string, string> = {
   class: "#3b82f6", // blue-500
@@ -125,6 +127,8 @@ export function GraphView({
 }: GraphViewProps) {
   const cyRef = useRef<Core | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { settings } = useSettings();
+  const graphSettings = settings.graphView;
 
   // Convert graph data to Cytoscape elements
   const elements = useMemo(() => {
@@ -209,10 +213,12 @@ export function GraphView({
     const cy = cyRef.current;
     if (!cy || elements.length === 0) return;
 
-    // Run layout
-    const layout = cy.layout(getLayoutOptions("cose", elements.length));
+    // Run layout with animation settings
+    const animationDuration = ANIMATION_DURATION[graphSettings.animationSpeed];
+    const layoutName = graphSettings.defaultLayout;
+    const layout = cy.layout(getLayoutOptions(layoutName, elements.length, animationDuration));
     layout.run();
-  }, [elements]);
+  }, [elements, graphSettings.animationSpeed, graphSettings.defaultLayout]);
 
   const handleCyInit = useCallback((cy: Core) => {
     cyRef.current = cy;
@@ -253,9 +259,10 @@ export function GraphView({
     const cy = cyRef.current;
     if (!cy) return;
 
-    const layout = cy.layout(getLayoutOptions(layoutName, elements.length));
+    const animationDuration = ANIMATION_DURATION[graphSettings.animationSpeed];
+    const layout = cy.layout(getLayoutOptions(layoutName, elements.length, animationDuration));
     layout.run();
-  }, [elements.length]);
+  }, [elements.length, graphSettings.animationSpeed]);
 
   const handleFitGraph = useCallback(() => {
     const cy = cyRef.current;
@@ -372,7 +379,7 @@ export function GraphView({
           stylesheet={stylesheet}
           cy={handleCyInit}
           style={{ width: "100%", height: "100%" }}
-          wheelSensitivity={0.3}
+          wheelSensitivity={graphSettings.scrollSpeed}
           minZoom={0.1}
           maxZoom={3}
         />
@@ -410,11 +417,11 @@ function getNodeSize(node: GraphNode): number {
   }
 }
 
-function getLayoutOptions(name: LayoutName, nodeCount: number): LayoutOptions {
+function getLayoutOptions(name: LayoutName, nodeCount: number, animationDuration = 300): LayoutOptions {
   const baseOptions = {
     name,
-    animate: nodeCount < 100,
-    animationDuration: 300,
+    animate: animationDuration > 0 && nodeCount < 100,
+    animationDuration,
   };
 
   switch (name) {
