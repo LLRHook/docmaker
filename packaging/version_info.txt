@@ -1,0 +1,46 @@
+# UTF-8
+#
+# Windows version info file for Docmaker
+# Used by PyInstaller to set executable properties
+#
+# VSVersionInfo format docs:
+# https://pyinstaller.org/en/stable/spec-files.html#adding-version-information
+
+VSVersionInfo(
+    ffi=FixedFileInfo(
+        # Version numbers (Major, Minor, Patch, Build)
+        filevers=(0, 1, 0, 0),
+        prodvers=(0, 1, 0, 0),
+        # File flags
+        mask=0x3f,
+        flags=0x0,
+        # Operating system: VOS_NT (Windows NT)
+        OS=0x40004,
+        # File type: VFT_APP (Application)
+        fileType=0x1,
+        # Subtype (not applicable for apps)
+        subtype=0x0,
+        # Creation date (not used)
+        date=(0, 0),
+    ),
+    kids=[
+        StringFileInfo(
+            [
+                StringTable(
+                    "040904B0",  # Language: US English, Charset: Unicode
+                    [
+                        StringStruct("CompanyName", "Docmaker"),
+                        StringStruct("FileDescription", "Docmaker - Code Knowledge Graph"),
+                        StringStruct("FileVersion", "0.1.0"),
+                        StringStruct("InternalName", "Docmaker"),
+                        StringStruct("LegalCopyright", "MIT License"),
+                        StringStruct("OriginalFilename", "Docmaker.exe"),
+                        StringStruct("ProductName", "Docmaker"),
+                        StringStruct("ProductVersion", "0.1.0"),
+                    ],
+                )
+            ]
+        ),
+        VarFileInfo([VarStruct("Translation", [0x0409, 1200])]),  # US English, Unicode
+    ],
+)

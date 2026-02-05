@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Docmaker
+Comment=Code-to-Knowledge Pipeline - Generate Obsidian documentation from code
+Exec=/opt/docmaker/Docmaker %F
+Icon=docmaker
+Terminal=false
+Type=Application
+Categories=Development;Documentation;Utility;
+Keywords=code;documentation;obsidian;knowledge;graph;
+MimeType=inode/directory;
+StartupNotify=true
+StartupWMClass=Docmaker
