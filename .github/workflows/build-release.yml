@@ -114,4 +114,4 @@ jobs:
             artifacts/**/*.tar.gz
             artifacts/**/*.deb
           generate_release_notes: true
-          draft: true
+          draft: false

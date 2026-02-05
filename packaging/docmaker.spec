@@ -90,6 +90,11 @@ datas = []
 if FRONTEND_DIST.exists():
     datas.append((str(FRONTEND_DIST), "frontend"))
 
+# Add icon PNG for runtime icon (Qt uses PNG, not ICO for runtime)
+ICON_PNG = ICONS_DIR / "docmaker.png"
+if ICON_PNG.exists():
+    datas.append((str(ICON_PNG), "icons"))
+
 # Analysis
 a = Analysis(
     [str(PACKAGING_DIR / "launcher.py")],

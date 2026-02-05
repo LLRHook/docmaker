@@ -45,6 +45,18 @@ class LLMProvider(ABC):
         """Check if the LLM provider is available."""
         pass
 
+    def _parse_category(self, answer: str) -> FileCategory:
+        """Parse the LLM response into a FileCategory."""
+        answer = answer.split()[0] if answer else ""
+        mapping = {
+            "BACKEND": FileCategory.BACKEND,
+            "FRONTEND": FileCategory.FRONTEND,
+            "CONFIG": FileCategory.CONFIG,
+            "TEST": FileCategory.TEST,
+            "IGNORE": FileCategory.IGNORE,
+        }
+        return mapping.get(answer, FileCategory.UNKNOWN)
+
 
 class OllamaProvider(LLMProvider):
     """Ollama LLM provider."""
@@ -88,18 +100,6 @@ class OllamaProvider(LLMProvider):
         except Exception as e:
             logger.warning(f"LLM classification failed for {file.relative_path}: {e}")
             return file.category
-
-    def _parse_category(self, answer: str) -> FileCategory:
-        """Parse the LLM response into a FileCategory."""
-        answer = answer.split()[0] if answer else ""
-        mapping = {
-            "BACKEND": FileCategory.BACKEND,
-            "FRONTEND": FileCategory.FRONTEND,
-            "CONFIG": FileCategory.CONFIG,
-            "TEST": FileCategory.TEST,
-            "IGNORE": FileCategory.IGNORE,
-        }
-        return mapping.get(answer, FileCategory.UNKNOWN)
 
 
 class LMStudioProvider(LLMProvider):
@@ -152,18 +152,6 @@ class LMStudioProvider(LLMProvider):
             logger.warning(f"LLM classification failed for {file.relative_path}: {e}")
             return file.category
 
-    def _parse_category(self, answer: str) -> FileCategory:
-        """Parse the LLM response into a FileCategory."""
-        answer = answer.split()[0] if answer else ""
-        mapping = {
-            "BACKEND": FileCategory.BACKEND,
-            "FRONTEND": FileCategory.FRONTEND,
-            "CONFIG": FileCategory.CONFIG,
-            "TEST": FileCategory.TEST,
-            "IGNORE": FileCategory.IGNORE,
-        }
-        return mapping.get(answer, FileCategory.UNKNOWN)
-
 
 class OpenAIProvider(LLMProvider):
     """OpenAI API provider."""
@@ -210,18 +198,6 @@ class OpenAIProvider(LLMProvider):
         except Exception as e:
             logger.warning(f"LLM classification failed for {file.relative_path}: {e}")
             return file.category
-
-    def _parse_category(self, answer: str) -> FileCategory:
-        """Parse the LLM response into a FileCategory."""
-        answer = answer.split()[0] if answer else ""
-        mapping = {
-            "BACKEND": FileCategory.BACKEND,
-            "FRONTEND": FileCategory.FRONTEND,
-            "CONFIG": FileCategory.CONFIG,
-            "TEST": FileCategory.TEST,
-            "IGNORE": FileCategory.IGNORE,
-        }
-        return mapping.get(answer, FileCategory.UNKNOWN)
 
 
 class NoOpProvider(LLMProvider):

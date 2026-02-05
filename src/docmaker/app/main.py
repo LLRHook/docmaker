@@ -11,6 +11,25 @@ from docmaker.app.ipc import DocmakerAPI
 logger = logging.getLogger(__name__)
 
 
+def get_icon_path() -> Path | None:
+    """Get the application icon path.
+
+    Handles both development mode and PyInstaller frozen mode.
+
+    Returns:
+        Path to the icon PNG file, or None if not found
+    """
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        # Running as PyInstaller bundle
+        icon_path = Path(sys._MEIPASS) / "icons" / "docmaker.png"
+    else:
+        # Development mode
+        icon_path = (
+            Path(__file__).parent.parent.parent.parent / "packaging" / "icons" / "docmaker.png"
+        )
+    return icon_path if icon_path.exists() else None
+
+
 def get_frontend_dir() -> Path:
     """Get the frontend directory path.
 
@@ -83,6 +102,14 @@ def create_app(dev_mode: bool = False) -> Pyloid:
         app_name="Docmaker",
         single_instance=True,
     )
+
+    # Set application icon for taskbar/window
+    icon_path = get_icon_path()
+    if icon_path:
+        logger.info(f"Setting application icon from {icon_path}")
+        app.set_icon(str(icon_path))
+    else:
+        logger.warning("Application icon not found")
 
     return app
 
