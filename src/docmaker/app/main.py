@@ -15,6 +15,40 @@ FRONTEND_DIR = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
 DEV_URL = "http://localhost:5173"
 
 
+def setup_app_logging(dev_mode: bool = False) -> None:
+    """Configure logging for the desktop application.
+
+    Args:
+        dev_mode: If True, use DEBUG level, otherwise INFO
+    """
+    level = logging.DEBUG if dev_mode else logging.INFO
+
+    # Create a formatter
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    # Create console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(level)
+    console_handler.setFormatter(formatter)
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+
+    # Remove any existing handlers to avoid duplicates
+    root_logger.handlers.clear()
+    root_logger.addHandler(console_handler)
+
+    # Also configure docmaker loggers specifically
+    docmaker_logger = logging.getLogger("docmaker")
+    docmaker_logger.setLevel(level)
+
+    logger.info("Logging initialized (level=%s)", logging.getLevelName(level))
+
+
 def create_app(dev_mode: bool = False) -> Pyloid:
     """Create and configure the Pyloid application.
 
@@ -24,15 +58,14 @@ def create_app(dev_mode: bool = False) -> Pyloid:
     Returns:
         Configured Pyloid application instance
     """
+    # Set up logging first
+    setup_app_logging(dev_mode)
+
+    logger.info("Creating Pyloid application")
+
     app = Pyloid(
         app_name="Docmaker",
         single_instance=True,
-    )
-
-    # Set up logging
-    logging.basicConfig(
-        level=logging.DEBUG if dev_mode else logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     return app
@@ -46,7 +79,6 @@ def create_window(app: Pyloid, dev_mode: bool = False, project_path: str | None 
         dev_mode: If True, load from dev server
         project_path: Optional path to load on startup
     """
-    # Create the API instance
     api = DocmakerAPI()
 
     window = app.create_window(
@@ -54,6 +86,8 @@ def create_window(app: Pyloid, dev_mode: bool = False, project_path: str | None 
         width=1400,
         height=900,
         IPCs=[api],
+        context_menu=True,  # Enable right-click context menu (for DevTools copy)
+        dev_tools=dev_mode,  # Allow F12 to toggle DevTools
     )
 
     # Set window properties

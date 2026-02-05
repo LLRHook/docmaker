@@ -69,7 +69,7 @@ export function NodeDetails({ node, onClose, onOpenFile }: NodeDetailsProps) {
         </div>
         <button
           onClick={onClose}
-          className="p-1 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded"
+          className="p-1 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded-sm"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -139,7 +139,7 @@ export function NodeDetails({ node, onClose, onOpenFile }: NodeDetailsProps) {
                     <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">Implements</h3>
                     <div className="flex flex-wrap gap-1">
                       {classDetails.interfaces.map((iface) => (
-                        <span key={iface} className="px-2 py-0.5 bg-purple-900/50 text-purple-300 text-xs rounded">
+                        <span key={iface} className="px-2 py-0.5 bg-purple-900/50 text-purple-300 text-xs rounded-sm">
                           {iface}
                         </span>
                       ))}
@@ -197,7 +197,7 @@ export function NodeDetails({ node, onClose, onOpenFile }: NodeDetailsProps) {
                 <div className="mb-4">
                   <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">Endpoint</h3>
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 text-xs font-bold rounded ${getMethodColor(endpointDetails.httpMethod)}`}>
+                    <span className={`px-2 py-0.5 text-xs font-bold rounded-sm ${getMethodColor(endpointDetails.httpMethod)}`}>
                       {endpointDetails.httpMethod}
                     </span>
                     <span className="text-sm text-gray-300">{endpointDetails.path}</span>
@@ -242,7 +242,7 @@ export function NodeDetails({ node, onClose, onOpenFile }: NodeDetailsProps) {
         <button
           onClick={handleOpenFile}
           disabled={!node.metadata.path && !node.metadata.filePath}
-          className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm rounded flex items-center justify-center gap-2"
+          className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm rounded-sm flex items-center justify-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -263,7 +263,7 @@ function NodeTypeIcon({ type }: { type: string }) {
     file: "bg-orange-500",
   };
 
-  return <span className={`w-3 h-3 rounded ${colors[type] || "bg-gray-500"}`} />;
+  return <span className={`w-3 h-3 rounded-sm ${colors[type] || "bg-gray-500"}`} />;
 }
 
 function getMethodColor(method: string): string {

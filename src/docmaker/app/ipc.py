@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from pyloid.ipc import Bridge, PyloidIPC
+from PySide6.QtWidgets import QFileDialog
 
 from docmaker.app.graph_builder import GraphBuilder
 from docmaker.config import DocmakerConfig
@@ -28,6 +29,30 @@ class DocmakerAPI(PyloidIPC):
         self._config: DocmakerConfig | None = None
         self._files: list[SourceFile] = []
 
+    @Bridge(result=str)
+    def select_folder(self) -> str:
+        """Open a native folder picker dialog.
+
+        Returns:
+            JSON string with selected path or null if cancelled
+        """
+        logger.debug("select_folder called")
+        try:
+            selected = QFileDialog.getExistingDirectory(
+                None,
+                "Select Project Folder",
+                "",
+                QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks,
+            )
+            if selected:
+                logger.info("Folder selected: %s", selected)
+                return json.dumps({"path": selected})
+            logger.debug("Folder selection cancelled")
+            return json.dumps({"path": None})
+        except Exception as e:
+            logger.exception("Error opening folder dialog")
+            return json.dumps({"error": str(e)})
+
     @Bridge(str, result=str)
     def scan_project(self, path: str) -> str:
         """Scan a project directory and return file statistics.
@@ -38,12 +63,15 @@ class DocmakerAPI(PyloidIPC):
         Returns:
             JSON string with file list and statistics
         """
+        logger.info("scan_project called with path: %s", path)
         try:
             project_path = Path(path).resolve()
             if not project_path.exists():
+                logger.error("Path does not exist: %s", path)
                 return json.dumps({"error": f"Path does not exist: {path}"})
 
             if not project_path.is_dir():
+                logger.error("Path is not a directory: %s", path)
                 return json.dumps({"error": f"Path is not a directory: {path}"})
 
             self._current_project = project_path
@@ -74,6 +102,12 @@ class DocmakerAPI(PyloidIPC):
                     }
                 )
 
+            logger.info(
+                "Scan complete: %d files found (%s)",
+                len(self._files),
+                ", ".join(f"{k}:{v}" for k, v in by_language.items()),
+            )
+
             return json.dumps(
                 {
                     "projectPath": str(project_path),
@@ -102,12 +136,14 @@ class DocmakerAPI(PyloidIPC):
         Returns:
             JSON string with generation results
         """
+        logger.info("generate_docs called with options: %s", options_json)
         try:
             options = json.loads(options_json)
             incremental = options.get("incremental", False)
             use_llm = options.get("useLlm", False)
 
             if not self._current_project or not self._config:
+                logger.error("No project loaded")
                 return json.dumps({"error": "No project loaded. Call scan_project first."})
 
             self._config.llm.enabled = use_llm
@@ -124,6 +160,13 @@ class DocmakerAPI(PyloidIPC):
 
             # Store the symbol table for graph building
             self._symbol_table = pipeline.symbol_table
+
+            logger.info(
+                "Documentation generated: %d files, %d classes, %d endpoints",
+                len(pipeline.symbol_table.files),
+                len(pipeline.symbol_table.class_index),
+                len(pipeline.symbol_table.endpoint_index),
+            )
 
             return json.dumps(
                 {
@@ -171,9 +214,11 @@ class DocmakerAPI(PyloidIPC):
         Returns:
             JSON string with parsing results and graph data
         """
+        logger.info("parse_only called with path: %s", path)
         try:
             project_path = Path(path).resolve()
             if not project_path.exists():
+                logger.error("Path does not exist: %s", path)
                 return json.dumps({"error": f"Path does not exist: {path}"})
 
             self._current_project = project_path
@@ -191,18 +236,29 @@ class DocmakerAPI(PyloidIPC):
             ]
 
             # Parse files
+            logger.debug("Parsing %d relevant files", len(relevant_files))
             parser_registry = get_parser_registry()
             self._symbol_table = SymbolTable()
 
             for file in relevant_files:
                 if parser_registry.can_parse(file):
+                    logger.debug("Parsing file: %s", file.relative_path)
                     symbols = parser_registry.parse(file)
                     if symbols:
                         self._symbol_table.add_file_symbols(symbols)
 
             # Build graph
+            logger.debug("Building graph from symbol table")
             builder = GraphBuilder(self._symbol_table)
             graph = builder.build()
+
+            logger.info(
+                "Parse complete: %d files scanned, %d parsed, %d classes, %d endpoints",
+                len(self._files),
+                len(self._symbol_table.files),
+                len(self._symbol_table.class_index),
+                len(self._symbol_table.endpoint_index),
+            )
 
             return json.dumps(
                 {

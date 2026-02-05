@@ -40,12 +40,14 @@ const NODE_SHAPES: Record<string, string> = {
   file: "rectangle",
 };
 
-const EDGE_STYLES: Record<string, { lineStyle: string; lineColor: string; width: number }> = {
-  extends: { lineStyle: "solid", lineColor: "#3b82f6", width: 2 },
-  implements: { lineStyle: "dashed", lineColor: "#a855f7", width: 2 },
-  imports: { lineStyle: "solid", lineColor: "#6b7280", width: 1 },
-  calls: { lineStyle: "solid", lineColor: "#f59e0b", width: 1 },
-  contains: { lineStyle: "dotted", lineColor: "#4b5563", width: 1 },
+const DEFAULT_EDGE_STYLE = { lineStyle: "solid", color: "#6b7280", width: 1 };
+
+const EDGE_STYLES: Record<string, { lineStyle: string; color: string; width: number }> = {
+  extends: { lineStyle: "solid", color: "#3b82f6", width: 2 },
+  implements: { lineStyle: "dashed", color: "#a855f7", width: 2 },
+  imports: { lineStyle: "solid", color: "#6b7280", width: 1 },
+  calls: { lineStyle: "solid", color: "#f59e0b", width: 1 },
+  contains: { lineStyle: "dotted", color: "#4b5563", width: 1 },
 };
 
 const stylesheet: StylesheetDef[] = [
@@ -157,15 +159,18 @@ export function GraphView({
 
     const edgeElements = graph.edges
       .filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
-      .map((edge, index) => ({
-        data: {
-          id: `edge-${index}`,
-          source: edge.source,
-          target: edge.target,
-          edgeType: edge.type,
-          ...EDGE_STYLES[edge.type],
-        },
-      }));
+      .map((edge, index) => {
+        const style = EDGE_STYLES[edge.type] || DEFAULT_EDGE_STYLE;
+        return {
+          data: {
+            id: `edge-${index}`,
+            source: edge.source,
+            target: edge.target,
+            edgeType: edge.type,
+            ...style,
+          },
+        };
+      });
 
     return [...nodeElements, ...edgeElements];
   }, [graph, filters]);
@@ -335,7 +340,7 @@ export function GraphView({
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
           {Object.entries(NODE_COLORS).map(([type, color]) => (
             <div key={type} className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded" style={{ backgroundColor: color }} />
+              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
               <span className="text-gray-300 capitalize">{type}</span>
             </div>
           ))}
@@ -391,10 +396,11 @@ function getNodeSize(node: GraphNode): number {
     case "package":
       return 50;
     case "class":
-    case "interface":
+    case "interface": {
       // Size based on method count if available
       const methodCount = node.metadata.methodCount || 0;
       return Math.min(60, Math.max(30, 30 + methodCount * 2));
+    }
     case "endpoint":
       return 25;
     case "file":

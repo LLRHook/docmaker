@@ -111,7 +111,7 @@ export function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }:
           placeholder="Search nodes..."
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-gray-100 placeholder-gray-400 focus:outline-none focus:border-blue-500"
+          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 placeholder-gray-400 focus:outline-hidden focus:border-blue-500"
         />
       </div>
 
