@@ -14,8 +14,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "scrollSpeed": 0.3,
         "zoomSensitivity": 0.2,
         "animationSpeed": "normal",
-        "defaultLayout": "cose",
+        "defaultLayout": "fcose",
         "showLabels": True,
+        "layoutQuality": "default",
+        "nodeSizing": "byDegree",
+        "largeGraphThreshold": 200,
     },
     "appearance": {
         "fontSize": "medium",
