@@ -56,8 +56,12 @@ def get_parser_registry() -> ParserRegistry:
         _default_registry = ParserRegistry()
 
         from docmaker.parser.java_parser import JavaParser
+        from docmaker.parser.python_parser import PythonParser
+        from docmaker.parser.typescript_parser import TypeScriptParser
 
         _default_registry.register(JavaParser())
+        _default_registry.register(PythonParser())
+        _default_registry.register(TypeScriptParser())
 
     return _default_registry
 
