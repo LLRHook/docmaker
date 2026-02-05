@@ -4,6 +4,8 @@ Generate Obsidian-compatible documentation from your codebase.
 
 ## Features
 
+- **Desktop Application**: Interactive knowledge graph visualization of your codebase
+- **Graph Exploration**: Zoom, pan, filter, and click-to-navigate to source files
 - **Intelligent Crawling**: Traverses your repository while respecting `.gitignore` and custom ignore patterns
 - **LLM Classification**: Optionally uses local LLMs (Ollama, LM Studio) or cloud APIs (OpenAI, Anthropic) to classify files
 - **Java/Spring Boot Support**: Parses Java files using Tree-sitter, extracts classes, methods, and REST endpoints
@@ -22,6 +24,11 @@ Or for development:
 git clone <repo>
 cd docmaker
 pip install -e ".[dev]"
+
+# Build the frontend (required for desktop app)
+cd frontend
+npm install
+npm run build
 ```
 
 ## Quick Start
@@ -37,6 +44,39 @@ pip install -e ".[dev]"
    ```
 
 3. Open the `docs/` folder in Obsidian
+
+## Desktop Application
+
+Launch the interactive knowledge graph viewer:
+
+```bash
+docmaker app
+```
+
+The desktop app provides a visual representation of your codebase as an interactive graph. You can explore relationships between classes, interfaces, packages, and REST endpoints.
+
+### Key Features
+
+- **Interactive Graph**: Zoom, pan, and drag nodes to explore your codebase structure
+- **Multiple Layouts**: Force-directed (default), circular, and grid layouts
+- **Filtering**: Filter by node type (class, interface, endpoint, package, file)
+- **Node Details**: Click any node to view detailed information
+- **Source Navigation**: Jump directly to source files from the graph
+
+### Node Types
+
+- **Class**: Java classes with their methods and fields
+- **Interface**: Java interfaces
+- **Endpoint**: REST API endpoints (Spring Boot)
+- **Package**: Java packages
+- **File**: Source files
+
+### Edge Types
+
+- **extends**: Class inheritance
+- **implements**: Interface implementation
+- **imports**: Import dependencies
+- **contains**: Package/file containment
 
 ## Usage
 
@@ -66,6 +106,19 @@ docmaker scan /path/to/source
 
 ```bash
 docmaker clear-cache /path/to/source
+```
+
+### Desktop App
+
+```bash
+# Launch desktop app
+docmaker app
+
+# Launch with project pre-loaded
+docmaker app --project /path/to/source
+
+# Development mode (connects to Vite dev server)
+docmaker app --dev
 ```
 
 ## Configuration
