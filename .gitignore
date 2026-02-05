@@ -37,6 +37,7 @@ htmlcov/
 # Project-specific
 .docmaker_cache.json
 output/
+demo-docs/
 *.md.bak
 
 # Frontend
