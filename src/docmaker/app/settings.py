@@ -30,6 +30,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "openLastProjectOnStartup": False,
         "lastProjectPath": None,
     },
+    "layout": {
+        "windowWidth": 1280,
+        "windowHeight": 720,
+        "sidebarWidth": 288,
+        "detailsPanelWidth": 320,
+    },
 }
 
 

@@ -550,3 +550,49 @@ class DocmakerAPI(PyloidIPC):
         except Exception as e:
             logger.exception("Error resetting settings")
             return json.dumps({"error": str(e)})
+
+    @Bridge(int, int, result=str)
+    def resize_window(self, width: int, height: int) -> str:
+        """Resize the application window.
+
+        Args:
+            width: New window width in pixels
+            height: New window height in pixels
+
+        Returns:
+            JSON string with success status
+        """
+        try:
+            # Access the window through the app singleton
+            from docmaker.app.main import get_app_window
+
+            window = get_app_window()
+            if window:
+                window.resize(width, height)
+                logger.info("Window resized to %dx%d", width, height)
+                return json.dumps({"success": True, "width": width, "height": height})
+            else:
+                return json.dumps({"error": "Window not available"})
+        except Exception as e:
+            logger.exception("Error resizing window")
+            return json.dumps({"error": str(e)})
+
+    @Bridge(result=str)
+    def get_window_size(self) -> str:
+        """Get the current window size.
+
+        Returns:
+            JSON string with width and height
+        """
+        try:
+            from docmaker.app.main import get_app_window
+
+            window = get_app_window()
+            if window:
+                size = window.size()
+                return json.dumps({"width": size.width(), "height": size.height()})
+            else:
+                return json.dumps({"error": "Window not available"})
+        except Exception as e:
+            logger.exception("Error getting window size")
+            return json.dumps({"error": str(e)})

@@ -3,10 +3,17 @@ import { GraphView } from "./components/GraphView";
 import { Sidebar, type FilterState } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { NodeDetails } from "./components/NodeDetails";
+import { ResizablePanel } from "./components/ResizablePanel";
 import { SettingsModal } from "./components/settings";
 import { usePyloid } from "./hooks/usePyloid";
 import { useSettings } from "./contexts/SettingsContext";
 import type { CodeGraph, GraphNode } from "./types/graph";
+import {
+  MIN_SIDEBAR_WIDTH,
+  MIN_DETAILS_PANEL_WIDTH,
+  MAX_SIDEBAR_WIDTH,
+  MAX_DETAILS_PANEL_WIDTH,
+} from "./types/settings";
 import { createLogger } from "./utils/logger";
 
 const logger = createLogger("App");
@@ -172,6 +179,20 @@ export function App() {
     setDetailsPanelCollapsed((prev) => !prev);
   }, []);
 
+  const handleSidebarWidthChange = useCallback(
+    (width: number) => {
+      updateCategory("layout", { sidebarWidth: width });
+    },
+    [updateCategory]
+  );
+
+  const handleDetailsPanelWidthChange = useCallback(
+    (width: number) => {
+      updateCategory("layout", { detailsPanelWidth: width });
+    },
+    [updateCategory]
+  );
+
   // Navigate to a node in the graph (for clickable links in details panel)
   const handleNavigateToNode = useCallback((nodeId: string) => {
     const node = graph.nodes.find((n) => n.id === nodeId);
@@ -334,13 +355,21 @@ export function App() {
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <Sidebar
-          nodes={graph.nodes}
-          onNodeSelect={handleNodeSelect}
-          onFilterChange={setFilters}
-          selectedNodeId={selectedNodeId}
-        />
+        {/* Resizable Sidebar */}
+        <ResizablePanel
+          width={settings.layout.sidebarWidth}
+          minWidth={MIN_SIDEBAR_WIDTH}
+          maxWidth={MAX_SIDEBAR_WIDTH}
+          onWidthChange={handleSidebarWidthChange}
+          side="left"
+        >
+          <Sidebar
+            nodes={graph.nodes}
+            onNodeSelect={handleNodeSelect}
+            onFilterChange={setFilters}
+            selectedNodeId={selectedNodeId}
+          />
+        </ResizablePanel>
 
         {/* Graph view */}
         <GraphView
@@ -351,16 +380,36 @@ export function App() {
           onNodeDoubleClick={handleNodeDoubleClick}
         />
 
-        {/* Details panel */}
-        <NodeDetails
-          node={detailsNode}
-          isCollapsed={detailsPanelCollapsed}
-          onToggleCollapse={handleToggleDetailsPanel}
-          onClose={handleCloseDetails}
-          onOpenFile={handleOpenFile}
-          onNavigateToNode={handleNavigateToNode}
-          allNodes={graph.nodes}
-        />
+        {/* Resizable Details panel */}
+        {!detailsPanelCollapsed ? (
+          <ResizablePanel
+            width={settings.layout.detailsPanelWidth}
+            minWidth={MIN_DETAILS_PANEL_WIDTH}
+            maxWidth={MAX_DETAILS_PANEL_WIDTH}
+            onWidthChange={handleDetailsPanelWidthChange}
+            side="right"
+          >
+            <NodeDetails
+              node={detailsNode}
+              isCollapsed={detailsPanelCollapsed}
+              onToggleCollapse={handleToggleDetailsPanel}
+              onClose={handleCloseDetails}
+              onOpenFile={handleOpenFile}
+              onNavigateToNode={handleNavigateToNode}
+              allNodes={graph.nodes}
+            />
+          </ResizablePanel>
+        ) : (
+          <NodeDetails
+            node={detailsNode}
+            isCollapsed={detailsPanelCollapsed}
+            onToggleCollapse={handleToggleDetailsPanel}
+            onClose={handleCloseDetails}
+            onOpenFile={handleOpenFile}
+            onNavigateToNode={handleNavigateToNode}
+            allNodes={graph.nodes}
+          />
+        )}
       </div>
 
       {/* Status bar */}

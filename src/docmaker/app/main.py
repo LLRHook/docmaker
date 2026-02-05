@@ -49,6 +49,18 @@ def get_frontend_dir() -> Path:
 FRONTEND_DIR = get_frontend_dir()
 DEV_URL = "http://localhost:5173"
 
+# Global reference to the main window for IPC access
+_app_window = None
+
+
+def get_app_window():
+    """Get the main application window.
+
+    Returns:
+        The main window instance, or None if not created yet
+    """
+    return _app_window
+
 
 def setup_app_logging(dev_mode: bool = False) -> None:
     """Configure logging for the desktop application.
@@ -122,6 +134,7 @@ def create_window(app: Pyloid, dev_mode: bool = False, project_path: str | None 
         dev_mode: If True, load from dev server
         project_path: Optional path to load on startup
     """
+    global _app_window
     api = DocmakerAPI()
 
     window = app.create_window(
@@ -160,6 +173,9 @@ def create_window(app: Pyloid, dev_mode: bool = False, project_path: str | None 
 
     window.show()
     window.focus()
+
+    # Store global reference for IPC access
+    _app_window = window
 
     # If a project path was provided, signal the frontend to load it
     if project_path:
