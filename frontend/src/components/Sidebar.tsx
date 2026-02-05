@@ -30,6 +30,8 @@ const CATEGORIES = [
   { id: "unknown", label: "Unknown", color: "bg-gray-600" },
 ];
 
+const COLLAPSED_KEY = "docmaker-sidebar-collapsed";
+
 export function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeNodeTypes, setActiveNodeTypes] = useState<Set<string>>(
@@ -38,6 +40,26 @@ export function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }:
   const [activeCategories, setActiveCategories] = useState<Set<string>>(
     new Set(CATEGORIES.map((c) => c.id))
   );
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(COLLAPSED_KEY);
+      if (stored) return new Set(JSON.parse(stored) as string[]);
+    } catch { /* ignore */ }
+    return new Set();
+  });
+
+  const toggleGroupCollapse = (groupId: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
@@ -160,26 +182,39 @@ export function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }:
       <div className="flex-1 overflow-y-auto">
         {NODE_TYPES.filter((type) => nodesByType[type.id]?.length > 0).map((type) => (
           <div key={type.id} className="border-b border-gray-700">
-            <div className="px-3 py-2 bg-gray-750 flex items-center gap-2">
+            <button
+              onClick={() => toggleGroupCollapse(type.id)}
+              className="w-full px-3 py-2 bg-gray-750 flex items-center gap-2 hover:bg-gray-700/50 transition-colors"
+            >
+              <svg
+                className={`w-3 h-3 text-gray-400 transition-transform ${collapsedGroups.has(type.id) ? "" : "rotate-90"}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
               <span className={`w-2 h-2 rounded-full ${type.color}`} />
               <span className="text-xs font-semibold text-gray-300">
                 {type.label} ({nodesByType[type.id].length})
               </span>
-            </div>
-            <div className="max-h-48 overflow-y-auto">
-              {nodesByType[type.id].map((node) => (
-                <button
-                  key={node.id}
-                  onClick={() => onNodeSelect(node.id)}
-                  className={`w-full px-3 py-1.5 text-left text-sm truncate hover:bg-gray-700 ${
-                    selectedNodeId === node.id ? "bg-gray-700 text-blue-400" : "text-gray-300"
-                  }`}
-                  title={node.metadata.fqn || node.label}
-                >
-                  {node.label}
-                </button>
-              ))}
-            </div>
+            </button>
+            {!collapsedGroups.has(type.id) && (
+              <div className="max-h-48 overflow-y-auto">
+                {nodesByType[type.id].map((node) => (
+                  <button
+                    key={node.id}
+                    onClick={() => onNodeSelect(node.id)}
+                    className={`w-full px-3 py-1.5 text-left text-sm truncate hover:bg-gray-700 ${
+                      selectedNodeId === node.id ? "bg-gray-700 text-blue-400" : "text-gray-300"
+                    }`}
+                    title={node.metadata.fqn || node.label}
+                  >
+                    {node.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

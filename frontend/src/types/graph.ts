@@ -118,6 +118,15 @@ export interface ClassDetails {
   error?: string;
 }
 
+export type ParameterCategory = "path" | "query" | "header" | "body";
+
+export interface CategorizedParameter {
+  name: string;
+  type: string | null;
+  description: string | null;
+  category: ParameterCategory;
+}
+
 export interface EndpointDetails {
   httpMethod: string;
   path: string;

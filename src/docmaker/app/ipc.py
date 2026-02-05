@@ -426,6 +426,12 @@ class DocmakerAPI(PyloidIPC):
 
             cls = self._symbol_table.class_index.get(class_fqn)
             if not cls:
+                for fqn, class_def in self._symbol_table.class_index.items():
+                    if class_def.name == class_fqn or fqn.endswith(f".{class_fqn}"):
+                        cls = class_def
+                        class_fqn = fqn
+                        break
+            if not cls:
                 return json.dumps({"error": f"Class not found: {class_fqn}"})
 
             return json.dumps(
