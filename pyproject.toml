@@ -25,6 +25,7 @@ classifiers = [
 dependencies = [
     "tree-sitter>=0.21.0",
     "tree-sitter-java>=0.21.0",
+    "tree-sitter-kotlin>=0.21.0",
     "tree-sitter-python>=0.21.0",
     "tree-sitter-typescript>=0.21.0",
     "pyyaml>=6.0",
