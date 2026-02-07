@@ -61,7 +61,7 @@ const EDGE_STYLES: Record<string, { lineStyle: string; color: string; width: num
   extends: { lineStyle: "solid", color: "#3b82f6", width: 2 },
   implements: { lineStyle: "dashed", color: "#a855f7", width: 2 },
   imports: { lineStyle: "solid", color: "#6b7280", width: 1 },
-  calls: { lineStyle: "solid", color: "#f59e0b", width: 1 },
+  calls: { lineStyle: "dotted", color: "#9ca3af", width: 1 },
   contains: { lineStyle: "dotted", color: "#4b5563", width: 1 },
 };
 
@@ -246,7 +246,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
     const visibleNodeIds = new Set(nodeElements.map((n) => n.data.id));
 
     const edgeElements = graph.edges
-      .filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
+      .filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target) && filters.edgeTypes.has(edge.type))
       .map((edge) => {
         const style = EDGE_STYLES[edge.type] || DEFAULT_EDGE_STYLE;
         return {
@@ -598,6 +598,10 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
           <div className="flex items-center gap-1.5">
             <span className="w-4 h-0.5 bg-gray-500" />
             <span className="text-gray-400">imports</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-4 h-0.5 bg-gray-400" style={{ borderTopWidth: 2, borderStyle: "dotted" }} />
+            <span className="text-gray-400">calls</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-4 h-0.5 bg-gray-600" style={{ borderTopWidth: 2, borderStyle: "dotted" }} />

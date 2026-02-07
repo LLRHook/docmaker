@@ -36,6 +36,7 @@ export function App() {
   const [filters, setFilters] = useState<FilterState>({
     nodeTypes: new Set(["class", "interface", "endpoint", "package", "file"]),
     categories: new Set(["backend", "frontend", "config", "test", "unknown"]),
+    edgeTypes: new Set(["extends", "implements", "imports", "calls", "contains"]),
     searchQuery: "",
   });
   const [showOpenMenu, setShowOpenMenu] = useState(false);
