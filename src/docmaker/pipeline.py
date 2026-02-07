@@ -160,13 +160,9 @@ class Pipeline:
         if not self.symbol_table.files:
             return
 
-        total_classes = sum(
-            len(fs.classes) for fs in self.symbol_table.files.values()
-        )
+        total_classes = sum(len(fs.classes) for fs in self.symbol_table.files.values())
         total_methods = sum(
-            len(m.methods)
-            for fs in self.symbol_table.files.values()
-            for m in fs.classes
+            len(m.methods) for fs in self.symbol_table.files.values() for m in fs.classes
         ) + sum(len(fs.functions) for fs in self.symbol_table.files.values())
 
         self.console.print(
@@ -192,26 +188,19 @@ class Pipeline:
                     progress.advance(task)
 
                     for method in cls.methods:
-                        summary = self.summarizer.summarize_method(
-                            method, cls.name, language
-                        )
+                        summary = self.summarizer.summarize_method(method, cls.name, language)
                         if summary:
                             method.summary = summary
                         progress.advance(task)
 
                 for func in file_symbols.functions:
-                    summary = self.summarizer.summarize_method(
-                        func, "(module-level)", language
-                    )
+                    summary = self.summarizer.summarize_method(func, "(module-level)", language)
                     if summary:
                         func.summary = summary
                     progress.advance(task)
 
         class_summaries = sum(
-            1
-            for fs in self.symbol_table.files.values()
-            for cls in fs.classes
-            if cls.summary
+            1 for fs in self.symbol_table.files.values() for cls in fs.classes if cls.summary
         )
         method_summaries = sum(
             1
@@ -219,12 +208,7 @@ class Pipeline:
             for cls in fs.classes
             for m in cls.methods
             if m.summary
-        ) + sum(
-            1
-            for fs in self.symbol_table.files.values()
-            for f in fs.functions
-            if f.summary
-        )
+        ) + sum(1 for fs in self.symbol_table.files.values() for f in fs.functions if f.summary)
 
         self.console.print(
             f"[green]OK[/green] Generated {class_summaries} class summaries "

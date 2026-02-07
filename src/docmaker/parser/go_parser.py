@@ -28,18 +28,20 @@ GO_LANGUAGE = Language(tsgo.language())
 class GoParser(BaseParser):
     """Parser for Go source files using Tree-sitter."""
 
-    _type_node_types = frozenset({
-        "type_identifier",
-        "pointer_type",
-        "slice_type",
-        "map_type",
-        "array_type",
-        "qualified_type",
-        "channel_type",
-        "function_type",
-        "interface_type",
-        "struct_type",
-    })
+    _type_node_types = frozenset(
+        {
+            "type_identifier",
+            "pointer_type",
+            "slice_type",
+            "map_type",
+            "array_type",
+            "qualified_type",
+            "channel_type",
+            "function_type",
+            "interface_type",
+            "struct_type",
+        }
+    )
 
     def __init__(self):
         self._parser = Parser(GO_LANGUAGE)
@@ -60,16 +62,12 @@ class GoParser(BaseParser):
         symbols.package = self._extract_package(tree.root_node, content)
         symbols.imports = self._extract_imports(tree.root_node, content)
 
-        structs, interfaces = self._extract_type_declarations(
-            tree.root_node, content, file.path
-        )
+        structs, interfaces = self._extract_type_declarations(tree.root_node, content, file.path)
         symbols.classes = structs + interfaces
 
         symbols.functions = self._extract_functions(tree.root_node, content, file.path)
 
-        self._attach_methods_to_structs(
-            tree.root_node, content, file.path, symbols.classes
-        )
+        self._attach_methods_to_structs(tree.root_node, content, file.path, symbols.classes)
 
         return symbols
 
@@ -300,9 +298,7 @@ class GoParser(BaseParser):
             source_code=self._get_node_text(node, content),
         )
 
-    def _extract_functions(
-        self, root: Node, content: str, file_path: Path
-    ) -> list[FunctionDef]:
+    def _extract_functions(self, root: Node, content: str, file_path: Path) -> list[FunctionDef]:
         """Extract top-level function declarations (not methods)."""
         functions = []
         for child in root.children:
@@ -312,9 +308,7 @@ class GoParser(BaseParser):
                     functions.append(func)
         return functions
 
-    def _parse_function(
-        self, node: Node, content: str, file_path: Path
-    ) -> FunctionDef | None:
+    def _parse_function(self, node: Node, content: str, file_path: Path) -> FunctionDef | None:
         """Parse a function declaration."""
         name = None
         parameters = []
@@ -432,9 +426,7 @@ class GoParser(BaseParser):
                 parameters.extend(params)
         return parameters
 
-    def _parse_parameter_declaration(
-        self, node: Node, content: str
-    ) -> list[Parameter]:
+    def _parse_parameter_declaration(self, node: Node, content: str) -> list[Parameter]:
         """Parse a single parameter declaration (may contain multiple names)."""
         names = []
         param_type = None
