@@ -1,12 +1,16 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { GraphView } from "./components/GraphView";
-import { Sidebar, type FilterState } from "./components/Sidebar";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { GraphView, type GraphViewHandle } from "./components/GraphView";
+import { Sidebar, type FilterState, type SidebarHandle } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { NodeDetails } from "./components/NodeDetails";
 import { ResizablePanel } from "./components/ResizablePanel";
 import { SettingsModal } from "./components/settings";
+import { BreadcrumbTrail } from "./components/BreadcrumbTrail";
+import { KeyboardShortcutHelp } from "./components/KeyboardShortcutHelp";
 import { usePyloid } from "./hooks/usePyloid";
 import { useSettings } from "./contexts/SettingsContext";
+import { useNavigationHistory } from "./hooks/useNavigationHistory";
+import { useKeyboardNavigation, type KeyboardNavigationCallbacks } from "./hooks/useKeyboardNavigation";
 import type { CodeGraph, GraphNode } from "./types/graph";
 import {
   MIN_SIDEBAR_WIDTH,
@@ -39,11 +43,15 @@ export function App() {
   const [pathInputValue, setPathInputValue] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [detailsPanelCollapsed, setDetailsPanelCollapsed] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const graphRef = useRef<GraphViewHandle>(null);
+  const sidebarRef = useRef<SidebarHandle>(null);
 
   const { isAvailable, selectFolder, parseOnly, openFile, clearCaches } = usePyloid();
   const { settings, updateCategory } = useSettings();
+  const navHistory = useNavigationHistory();
 
   // Check if running in Pyloid (now reactive)
   const pyloidAvailable = isAvailable();
@@ -163,11 +171,13 @@ export function App() {
       // Auto-expand panel when selecting a node
       if (node) {
         setDetailsPanelCollapsed(false);
+        // Push to navigation history
+        navHistory.push({ nodeId: node.id, label: node.label, type: node.type });
       }
     } else {
       setDetailsNode(null);
     }
-  }, [graph.nodes]);
+  }, [graph.nodes, navHistory]);
 
   const handleNodeDoubleClick = useCallback(async (node: GraphNode) => {
     const path = node.metadata.path || node.metadata.filePath;
@@ -207,12 +217,85 @@ export function App() {
       setSelectedNodeId(nodeId);
       setDetailsNode(node);
       setDetailsPanelCollapsed(false);
+      navHistory.push({ nodeId: node.id, label: node.label, type: node.type });
     }
-  }, [graph.nodes]);
+  }, [graph.nodes, navHistory]);
 
   const handleOpenFile = useCallback(async (path: string, line: number) => {
     await openFile(path, line);
   }, [openFile]);
+
+  // Breadcrumb callbacks
+  const handleBreadcrumbGoBack = useCallback(() => {
+    const entry = navHistory.goBack();
+    if (entry) {
+      handleNodeSelect(entry.nodeId);
+      graphRef.current?.centerOnNode(entry.nodeId);
+    }
+  }, [navHistory, handleNodeSelect]);
+
+  const handleBreadcrumbGoForward = useCallback(() => {
+    const entry = navHistory.goForward();
+    if (entry) {
+      handleNodeSelect(entry.nodeId);
+      graphRef.current?.centerOnNode(entry.nodeId);
+    }
+  }, [navHistory, handleNodeSelect]);
+
+  const handleBreadcrumbGoTo = useCallback((index: number) => {
+    const entry = navHistory.goTo(index);
+    if (entry) {
+      handleNodeSelect(entry.nodeId);
+      graphRef.current?.centerOnNode(entry.nodeId);
+    }
+  }, [navHistory, handleNodeSelect]);
+
+  // Keyboard navigation callbacks
+  const NODE_TYPE_IDS = ["class", "interface", "endpoint", "package", "file"];
+
+  const keyboardCallbacks: KeyboardNavigationCallbacks = useMemo(() => ({
+    focusSearch: () => sidebarRef.current?.focusSearch(),
+    clearSearch: () => sidebarRef.current?.clearSearch(),
+    deselectNode: () => handleNodeSelect(null),
+    fitGraph: () => graphRef.current?.fitGraph(),
+    navigateConnected: (direction: "incoming" | "outgoing") => {
+      if (!selectedNodeId || !graphRef.current) return;
+      const connected = graphRef.current.getConnectedNodeIds(selectedNodeId);
+      const ids = direction === "incoming" ? connected.incoming : connected.outgoing;
+      if (ids.length > 0) {
+        handleNodeSelect(ids[0]);
+        graphRef.current.centerOnNode(ids[0]);
+      }
+    },
+    nextSearchResult: () => {
+      if (!sidebarRef.current) return;
+      const ids = sidebarRef.current.getFilteredNodeIds();
+      if (ids.length === 0) return;
+      const currentIndex = selectedNodeId ? ids.indexOf(selectedNodeId) : -1;
+      const nextIndex = (currentIndex + 1) % ids.length;
+      handleNodeSelect(ids[nextIndex]);
+      graphRef.current?.centerOnNode(ids[nextIndex]);
+    },
+    prevSearchResult: () => {
+      if (!sidebarRef.current) return;
+      const ids = sidebarRef.current.getFilteredNodeIds();
+      if (ids.length === 0) return;
+      const currentIndex = selectedNodeId ? ids.indexOf(selectedNodeId) : 0;
+      const prevIndex = (currentIndex - 1 + ids.length) % ids.length;
+      handleNodeSelect(ids[prevIndex]);
+      graphRef.current?.centerOnNode(ids[prevIndex]);
+    },
+    toggleNodeType: (index: number) => {
+      if (index >= 0 && index < NODE_TYPE_IDS.length) {
+        sidebarRef.current?.toggleNodeType(NODE_TYPE_IDS[index]);
+      }
+    },
+    goBack: handleBreadcrumbGoBack,
+    goForward: handleBreadcrumbGoForward,
+    toggleHelp: () => setShowKeyboardHelp((prev) => !prev),
+  }), [selectedNodeId, handleNodeSelect, handleBreadcrumbGoBack, handleBreadcrumbGoForward]);
+
+  useKeyboardNavigation(keyboardCallbacks);
 
   // Handle project load from CLI argument
   useEffect(() => {
@@ -353,12 +436,35 @@ export function App() {
           </svg>
         </button>
 
+        {/* Keyboard help button */}
+        <button
+          onClick={() => setShowKeyboardHelp(true)}
+          className="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded"
+          title="Keyboard shortcuts (?)"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+
         {!pyloidAvailable && (
           <span className="text-xs text-yellow-500 bg-yellow-900/30 px-2 py-1 rounded-sm">
             Dev Mode
           </span>
         )}
       </header>
+
+      {/* Breadcrumb Trail */}
+      <BreadcrumbTrail
+        entries={navHistory.entries}
+        cursor={navHistory.cursor}
+        canGoBack={navHistory.canGoBack}
+        canGoForward={navHistory.canGoForward}
+        onGoBack={handleBreadcrumbGoBack}
+        onGoForward={handleBreadcrumbGoForward}
+        onGoTo={handleBreadcrumbGoTo}
+        onClear={navHistory.clear}
+      />
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
@@ -371,6 +477,7 @@ export function App() {
           side="left"
         >
           <Sidebar
+            ref={sidebarRef}
             nodes={graph.nodes}
             onNodeSelect={handleNodeSelect}
             onFilterChange={setFilters}
@@ -380,6 +487,7 @@ export function App() {
 
         {/* Graph view */}
         <GraphView
+          ref={graphRef}
           graph={graph}
           filters={filters}
           selectedNodeId={selectedNodeId}
@@ -429,6 +537,9 @@ export function App() {
 
       {/* Settings modal */}
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+
+      {/* Keyboard shortcut help overlay */}
+      <KeyboardShortcutHelp isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
     </div>
   );
 }
