@@ -29,6 +29,7 @@ interface GraphViewProps {
   selectedNodeId: string | null;
   onNodeSelect: (nodeId: string | null) => void;
   onNodeDoubleClick: (node: GraphNode) => void;
+  onEdgeTypeToggle: (edgeType: string) => void;
 }
 
 export interface GraphViewHandle {
@@ -142,12 +143,21 @@ interface TooltipState {
   handler?: string;
 }
 
+const EDGE_TYPE_META: { id: string; label: string; color: string }[] = [
+  { id: "extends", label: "Extends", color: "#3b82f6" },
+  { id: "implements", label: "Implements", color: "#a855f7" },
+  { id: "imports", label: "Imports", color: "#6b7280" },
+  { id: "calls", label: "Calls", color: "#f59e0b" },
+  { id: "contains", label: "Contains", color: "#4b5563" },
+];
+
 export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(function GraphView({
   graph,
   filters,
   selectedNodeId,
   onNodeSelect,
   onNodeDoubleClick,
+  onEdgeTypeToggle,
 }, ref) {
   const cyRef = useRef<Core | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -246,7 +256,11 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
     const visibleNodeIds = new Set(nodeElements.map((n) => n.data.id));
 
     const edgeElements = graph.edges
-      .filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
+      .filter((edge) =>
+        visibleNodeIds.has(edge.source) &&
+        visibleNodeIds.has(edge.target) &&
+        filters.edgeTypes.has(edge.type)
+      )
       .map((edge) => {
         const style = EDGE_STYLES[edge.type] || DEFAULT_EDGE_STYLE;
         return {
@@ -573,6 +587,29 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
           </svg>
         </button>
+
+        {/* Edge type filters */}
+        <div className="bg-gray-800 rounded-lg shadow-lg flex items-center px-2 gap-1">
+          <span className="text-xs text-gray-500 px-1">Edges:</span>
+          {EDGE_TYPE_META.map((et) => (
+            <button
+              key={et.id}
+              onClick={() => onEdgeTypeToggle(et.id)}
+              className={`px-2 py-1.5 text-xs rounded flex items-center gap-1 transition-colors ${
+                filters.edgeTypes.has(et.id)
+                  ? "text-gray-100"
+                  : "text-gray-500 opacity-50"
+              }`}
+              title={`${filters.edgeTypes.has(et.id) ? "Hide" : "Show"} ${et.label.toLowerCase()} edges`}
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: et.color }}
+              />
+              {et.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Legend */}

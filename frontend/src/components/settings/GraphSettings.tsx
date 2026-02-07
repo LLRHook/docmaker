@@ -1,9 +1,10 @@
 import { useSettings } from "../../contexts/SettingsContext";
-import type { GraphViewSettings } from "../../types/settings";
+import type { GraphViewSettings, EdgeType } from "../../types/settings";
 import {
   LAYOUT_LABELS,
   LAYOUT_QUALITY_LABELS,
   NODE_SIZING_LABELS,
+  ALL_EDGE_TYPES,
 } from "../../types/settings";
 
 export function GraphSettings() {
@@ -40,6 +41,12 @@ export function GraphSettings() {
 
   const handleLargeGraphThresholdChange = (value: number) => {
     updateCategory("graphView", { largeGraphThreshold: value });
+  };
+
+  const handleEdgeTypeFilterChange = (edgeType: EdgeType, enabled: boolean) => {
+    updateCategory("graphView", {
+      edgeTypeFilters: { ...graphView.edgeTypeFilters, [edgeType]: enabled },
+    });
   };
 
   return (
@@ -213,6 +220,32 @@ export function GraphSettings() {
         <label htmlFor="showLabels" className="text-sm text-gray-300">
           Show Node Labels
         </label>
+      </div>
+
+      {/* Default Edge Type Filters */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Default Edge Types
+        </label>
+        <div className="space-y-2">
+          {ALL_EDGE_TYPES.map((edgeType) => (
+            <div key={edgeType} className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id={`edge-${edgeType}`}
+                checked={graphView.edgeTypeFilters[edgeType]}
+                onChange={(e) => handleEdgeTypeFilterChange(edgeType, e.target.checked)}
+                className="w-4 h-4 bg-gray-700 border-gray-600 rounded text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+              />
+              <label htmlFor={`edge-${edgeType}`} className="text-sm text-gray-300 capitalize">
+                {edgeType}
+              </label>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Edge types enabled by default when opening a project
+        </p>
       </div>
     </div>
   );

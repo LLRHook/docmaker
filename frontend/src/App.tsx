@@ -17,6 +17,7 @@ import {
   MIN_DETAILS_PANEL_WIDTH,
   MAX_SIDEBAR_WIDTH,
   MAX_DETAILS_PANEL_WIDTH,
+  ALL_EDGE_TYPES,
 } from "./types/settings";
 import { createLogger } from "./utils/logger";
 import { markStart, markEnd, clearMetrics } from "./utils/perf";
@@ -33,10 +34,14 @@ export function App() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [detailsNode, setDetailsNode] = useState<GraphNode | null>(null);
   const [stats, setStats] = useState<{ files: number; classes: number; endpoints: number } | null>(null);
-  const [filters, setFilters] = useState<FilterState>({
-    nodeTypes: new Set(["class", "interface", "endpoint", "package", "file"]),
-    categories: new Set(["backend", "frontend", "config", "test", "unknown"]),
-    searchQuery: "",
+  const [filters, setFilters] = useState<FilterState>(() => {
+    const edgeFilters = settings.graphView.edgeTypeFilters;
+    return {
+      nodeTypes: new Set(["class", "interface", "endpoint", "package", "file"]),
+      categories: new Set(["backend", "frontend", "config", "test", "unknown"]),
+      edgeTypes: new Set(ALL_EDGE_TYPES.filter((t) => edgeFilters[t])),
+      searchQuery: "",
+    };
   });
   const [showOpenMenu, setShowOpenMenu] = useState(false);
   const [showPathInput, setShowPathInput] = useState(false);
@@ -186,6 +191,22 @@ export function App() {
       await openFile(path, line);
     }
   }, [openFile]);
+
+  const handleEdgeTypeToggle = useCallback((edgeType: string) => {
+    setFilters((prev) => {
+      const newEdgeTypes = new Set(prev.edgeTypes);
+      if (newEdgeTypes.has(edgeType)) {
+        newEdgeTypes.delete(edgeType);
+      } else {
+        newEdgeTypes.add(edgeType);
+      }
+      // Persist to settings
+      const edgeTypeFilters = { ...settings.graphView.edgeTypeFilters };
+      edgeTypeFilters[edgeType as keyof typeof edgeTypeFilters] = newEdgeTypes.has(edgeType);
+      updateCategory("graphView", { edgeTypeFilters });
+      return { ...prev, edgeTypes: newEdgeTypes };
+    });
+  }, [settings.graphView.edgeTypeFilters, updateCategory]);
 
   const handleCloseDetails = useCallback(() => {
     setDetailsNode(null);
@@ -482,6 +503,7 @@ export function App() {
             onNodeSelect={handleNodeSelect}
             onFilterChange={setFilters}
             selectedNodeId={selectedNodeId}
+            edgeTypes={filters.edgeTypes}
           />
         </ResizablePanel>
 
@@ -493,6 +515,7 @@ export function App() {
           selectedNodeId={selectedNodeId}
           onNodeSelect={handleNodeSelect}
           onNodeDoubleClick={handleNodeDoubleClick}
+          onEdgeTypeToggle={handleEdgeTypeToggle}
         />
 
         {/* Resizable Details panel */}
