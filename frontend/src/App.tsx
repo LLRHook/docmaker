@@ -7,6 +7,7 @@ import { ResizablePanel } from "./components/ResizablePanel";
 import { SettingsModal } from "./components/settings";
 import { BreadcrumbTrail } from "./components/BreadcrumbTrail";
 import { KeyboardShortcutHelp } from "./components/KeyboardShortcutHelp";
+import { OnboardingWizard } from "./components/OnboardingWizard";
 import { usePyloid } from "./hooks/usePyloid";
 import { useSettings } from "./contexts/SettingsContext";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
@@ -691,6 +692,18 @@ export function App() {
 
       {/* Keyboard shortcut help overlay */}
       <KeyboardShortcutHelp isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
+
+      {/* First-run onboarding wizard */}
+      {!settings.general.hasCompletedOnboarding && (
+        <OnboardingWizard
+          onSelectFolder={handleBrowseFolder}
+          onComplete={() => updateCategory("general", { hasCompletedOnboarding: true })}
+          projectLoaded={status === "ready"}
+          loadStats={stats}
+          loadStatus={status === "scanning" || status === "parsing" || status === "ready" || status === "error" ? status : "idle"}
+          loadMessage={statusMessage}
+        />
+      )}
     </div>
   );
 }
