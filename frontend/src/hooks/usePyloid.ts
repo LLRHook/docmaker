@@ -330,6 +330,21 @@ export function usePyloid() {
     }
   }, []);
 
+  const readSource = useCallback(async (path: string, startLine: number = 0, endLine: number = 0): Promise<{ lines: string[]; startLine: number; totalLines: number; language: string; path: string; error?: string }> => {
+    logger.debug("readSource called:", path, startLine, endLine);
+    try {
+      const result = await ipc.DocmakerAPI.read_source(path, startLine, endLine);
+      const parsed = JSON.parse(result);
+      if (parsed.error) {
+        logger.error("readSource error:", parsed.error);
+      }
+      return parsed;
+    } catch (error) {
+      logger.error("readSource failed:", error);
+      return { lines: [], startLine: 0, totalLines: 0, language: "", path: "", error: String(error) };
+    }
+  }, []);
+
   const clearCaches = useCallback(() => {
     classDetailsCache.current.clear();
     endpointDetailsCache.current.clear();
@@ -346,6 +361,7 @@ export function usePyloid() {
     getProjectInfo,
     getClassDetails,
     getEndpointDetails,
+    readSource,
     getSettings,
     saveSettings,
     resetSettings,
