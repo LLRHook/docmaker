@@ -2,11 +2,12 @@ import { memo, useRef, useEffect, useCallback, useMemo, useState, forwardRef, us
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
-import type { CodeGraph, GraphNode } from "../types/graph";
+import type { CodeGraph, GraphNode, EdgeType } from "../types/graph";
+import { EDGE_TYPES } from "../types/graph";
 import type { FilterState } from "./Sidebar";
 import { useSettings } from "../contexts/SettingsContext";
-import type { GraphViewSettings } from "../types/settings";
-import { ANIMATION_DURATION } from "../types/settings";
+import type { GraphViewSettings, EdgeTypeFilters } from "../types/settings";
+import { ANIMATION_DURATION, EDGE_TYPE_COLORS } from "../types/settings";
 import { markStart, markEnd } from "../utils/perf";
 import { GraphMinimap } from "./GraphMinimap";
 import { useLayoutWorker } from "../hooks/useLayoutWorker";
@@ -30,7 +31,7 @@ interface GraphViewProps {
   selectedNodeId: string | null;
   onNodeSelect: (nodeId: string | null) => void;
   onNodeDoubleClick: (node: GraphNode) => void;
-  onEdgeTypeToggle: (edgeType: string) => void;
+  onEdgeTypeToggle: (edgeType: EdgeType) => void;
 }
 
 export interface GraphViewHandle {
@@ -134,8 +135,47 @@ function buildStylesheet(largeGraph: boolean): StylesheetDef[] {
         width: 3,
       },
     },
-  ];
-}
+  },
+  // Search highlighting styles
+  {
+    selector: "node.search-match",
+    style: {
+      "border-width": 3,
+      "border-color": "#22d3ee",
+      "background-opacity": 1,
+    },
+  },
+  {
+    selector: "node.search-dimmed",
+    style: {
+      opacity: 0.2,
+    },
+  },
+  {
+    selector: "edge.search-dimmed",
+    style: {
+      opacity: 0.05,
+    },
+  },
+  // Compound node (package cluster) styles
+  {
+    selector: ":parent",
+    style: {
+      "background-color": "#1f2937",
+      "background-opacity": 0.6,
+      "border-color": "#4b5563",
+      "border-width": 1,
+      "border-style": "dashed" as unknown,
+      label: "data(label)",
+      "text-valign": "top",
+      "text-halign": "center",
+      "font-size": "12px",
+      color: "#9ca3af",
+      "text-margin-y": -8,
+      padding: "20px",
+    },
+  },
+];
 
 interface TooltipState {
   x: number;
@@ -184,6 +224,12 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   // Layout worker for off-thread computation on large graphs
   const { computeLayout: computeWorkerLayout } = useLayoutWorker();
   const [layoutInProgress, setLayoutInProgress] = useState(false);
+
+  // Graph search state (highlights without removing nodes)
+  const [graphSearchQuery, setGraphSearchQuery] = useState("");
+  const [graphSearchMatchIds, setGraphSearchMatchIds] = useState<string[]>([]);
+  const [graphSearchIndex, setGraphSearchIndex] = useState(0);
+  const graphSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Close export menu on click outside
   useEffect(() => {
@@ -235,6 +281,35 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   // Convert graph data to Cytoscape elements
   const elements = useMemo(() => {
     markStart("graph:buildElements");
+    const enableClustering = graphSettings.enablePackageClustering;
+
+    // Build package parent nodes if clustering is enabled
+    const packageParentElements: { data: Record<string, unknown> }[] = [];
+    const nodeParentMap = new Map<string, string>();
+
+    if (enableClustering) {
+      const packages = new Set<string>();
+      graph.nodes.forEach((node) => {
+        if (node.metadata.package) {
+          packages.add(node.metadata.package);
+          nodeParentMap.set(node.id, `pkg:${node.metadata.package}`);
+        }
+      });
+      packages.forEach((pkg) => {
+        packageParentElements.push({
+          data: {
+            id: `pkg:${pkg}`,
+            label: pkg,
+            color: NODE_COLORS.package,
+            shape: NODE_SHAPES.package,
+            size: 50,
+            nodeType: "package",
+            isCompound: true,
+          },
+        });
+      });
+    }
+
     const nodeElements = graph.nodes
       .filter((node) => {
         // Apply filters
@@ -257,6 +332,9 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
           shape: NODE_SHAPES[node.type] || "ellipse",
           size: getNodeSize(node, graphSettings.nodeSizing, nodeDegrees.get(node.id) || 0),
           nodeType: node.type,
+          ...(enableClustering && nodeParentMap.has(node.id)
+            ? { parent: nodeParentMap.get(node.id) }
+            : {}),
           ...node.metadata,
         },
       }));
@@ -284,10 +362,10 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
         };
       });
 
-    const result = [...nodeElements, ...edgeElements];
+    const result = [...packageParentElements, ...nodeElements, ...edgeElements];
     markEnd("graph:buildElements");
     return result;
-  }, [graph, filters, graphSettings.nodeSizing, nodeDegrees]);
+  }, [graph, filters, graphSettings.nodeSizing, graphSettings.enablePackageClustering, nodeDegrees]);
 
   // Handle node selection highlighting
   useEffect(() => {
@@ -327,6 +405,93 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
 
   // Build stylesheet with large-graph optimizations (no labels, straight edges)
   const stylesheet = useMemo(() => buildStylesheet(isLargeGraph), [isLargeGraph]);
+
+  // Graph search: highlight matching nodes, dim non-matching
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+
+    if (!graphSearchQuery) {
+      // Clear search highlights
+      cy.elements().removeClass("search-match search-dimmed");
+      setGraphSearchMatchIds([]);
+      setGraphSearchIndex(0);
+      return;
+    }
+
+    const query = graphSearchQuery.toLowerCase();
+    const matchIds: string[] = [];
+
+    cy.nodes().forEach((node) => {
+      const data = node.data();
+      const label = (data.label || "").toLowerCase();
+      const fqn = (data.fqn || "").toLowerCase();
+      const modifiers = (data.modifiers || []) as string[];
+      const annotations = (data.annotations || []) as { name: string }[];
+
+      const matchesLabel = label.includes(query);
+      const matchesFqn = fqn.includes(query);
+      const matchesModifier = modifiers.some((m: string) => m.toLowerCase().includes(query));
+      const matchesAnnotation = annotations.some((a: { name: string }) => a.name.toLowerCase().includes(query));
+
+      if (matchesLabel || matchesFqn || matchesModifier || matchesAnnotation) {
+        node.removeClass("search-dimmed");
+        node.addClass("search-match");
+        matchIds.push(node.id());
+      } else {
+        node.removeClass("search-match");
+        node.addClass("search-dimmed");
+      }
+    });
+
+    // Dim edges not connected to matched nodes
+    const matchIdSet = new Set(matchIds);
+    cy.edges().forEach((edge) => {
+      if (matchIdSet.has(edge.source().id()) || matchIdSet.has(edge.target().id())) {
+        edge.removeClass("search-dimmed");
+      } else {
+        edge.addClass("search-dimmed");
+      }
+    });
+
+    setGraphSearchMatchIds(matchIds);
+    if (matchIds.length > 0 && graphSearchIndex >= matchIds.length) {
+      setGraphSearchIndex(0);
+    }
+
+    // Center on first match
+    if (matchIds.length > 0) {
+      const firstMatch = cy.getElementById(matchIds[0]);
+      if (firstMatch.length) {
+        cy.animate({ center: { eles: firstMatch }, duration: 200 });
+      }
+    }
+  }, [graphSearchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Navigate graph search results
+  const handleGraphSearchNext = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy || graphSearchMatchIds.length === 0) return;
+    const nextIndex = (graphSearchIndex + 1) % graphSearchMatchIds.length;
+    setGraphSearchIndex(nextIndex);
+    const node = cy.getElementById(graphSearchMatchIds[nextIndex]);
+    if (node.length) {
+      cy.animate({ center: { eles: node }, duration: 200 });
+      onNodeSelect(graphSearchMatchIds[nextIndex]);
+    }
+  }, [graphSearchMatchIds, graphSearchIndex, onNodeSelect]);
+
+  const handleGraphSearchPrev = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy || graphSearchMatchIds.length === 0) return;
+    const prevIndex = (graphSearchIndex - 1 + graphSearchMatchIds.length) % graphSearchMatchIds.length;
+    setGraphSearchIndex(prevIndex);
+    const node = cy.getElementById(graphSearchMatchIds[prevIndex]);
+    if (node.length) {
+      cy.animate({ center: { eles: node }, duration: 200 });
+      onNodeSelect(graphSearchMatchIds[prevIndex]);
+    }
+  }, [graphSearchMatchIds, graphSearchIndex, onNodeSelect]);
 
   // Run layout — off-thread via web worker for large graphs, inline otherwise
   useEffect(() => {
@@ -560,88 +725,162 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   return (
     <div ref={containerRef} className="flex-1 relative bg-gray-900">
       {/* Toolbar */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
-        <div className="bg-gray-800 rounded-lg shadow-lg flex">
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+        {/* Top row: layout, zoom, export, minimap */}
+        <div className="flex gap-2">
+          <div className="bg-gray-800 rounded-lg shadow-lg flex">
+            <button
+              onClick={() => handleLayout("fcose")}
+              className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-l-lg"
+              title="Force-directed layout (fCoSE)"
+            >
+              Force
+            </button>
+            <button
+              onClick={() => handleLayout("circle")}
+              className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 border-l border-gray-700"
+              title="Circular layout"
+            >
+              Circle
+            </button>
+            <button
+              onClick={() => handleLayout("grid")}
+              className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-r-lg border-l border-gray-700"
+              title="Grid layout"
+            >
+              Grid
+            </button>
+          </div>
+
+          <div className="bg-gray-800 rounded-lg shadow-lg flex">
+            <button
+              onClick={handleZoomIn}
+              className="px-3 py-2 text-gray-300 hover:bg-gray-700 rounded-l-lg"
+              title="Zoom in"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </button>
+            <button
+              onClick={handleZoomOut}
+              className="px-3 py-2 text-gray-300 hover:bg-gray-700 border-l border-gray-700"
+              title="Zoom out"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+              </svg>
+            </button>
+            <button
+              onClick={handleFitGraph}
+              className="px-3 py-2 text-gray-300 hover:bg-gray-700 rounded-r-lg border-l border-gray-700"
+              title="Fit to screen (f)"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Export button */}
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="bg-gray-800 rounded-lg shadow-lg px-3 py-2 text-gray-300 hover:bg-gray-700 flex items-center gap-1.5"
+              title="Export graph"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span className="text-sm">Export</span>
+            </button>
+            {showExportMenu && (
+              <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[120px]">
+                <button
+                  onClick={handleExportPNG}
+                  className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 rounded-t-lg"
+                >
+                  PNG
+                </button>
+                <button
+                  onClick={handleExportSVG}
+                  className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 rounded-b-lg border-t border-gray-700"
+                >
+                  SVG
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Minimap toggle */}
           <button
-            onClick={() => handleLayout("fcose")}
-            className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-l-lg"
-            title="Force-directed layout (fCoSE)"
+            onClick={() => setShowMinimap(!showMinimap)}
+            className={`bg-gray-800 rounded-lg shadow-lg px-3 py-2 text-sm hover:bg-gray-700 ${showMinimap ? "text-blue-400" : "text-gray-300"}`}
+            title="Toggle minimap"
           >
-            Force
-          </button>
-          <button
-            onClick={() => handleLayout("circle")}
-            className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 border-l border-gray-700"
-            title="Circular layout"
-          >
-            Circle
-          </button>
-          <button
-            onClick={() => handleLayout("grid")}
-            className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-r-lg border-l border-gray-700"
-            title="Grid layout"
-          >
-            Grid
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
           </button>
         </div>
 
-        <div className="bg-gray-800 rounded-lg shadow-lg flex">
-          <button
-            onClick={handleZoomIn}
-            className="px-3 py-2 text-gray-300 hover:bg-gray-700 rounded-l-lg"
-            title="Zoom in"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-          </button>
-          <button
-            onClick={handleZoomOut}
-            className="px-3 py-2 text-gray-300 hover:bg-gray-700 border-l border-gray-700"
-            title="Zoom out"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-            </svg>
-          </button>
-          <button
-            onClick={handleFitGraph}
-            className="px-3 py-2 text-gray-300 hover:bg-gray-700 rounded-r-lg border-l border-gray-700"
-            title="Fit to screen (f)"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Export button */}
-        <div className="relative" ref={exportMenuRef}>
-          <button
-            onClick={() => setShowExportMenu(!showExportMenu)}
-            className="bg-gray-800 rounded-lg shadow-lg px-3 py-2 text-gray-300 hover:bg-gray-700 flex items-center gap-1.5"
-            title="Export graph"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            <span className="text-sm">Export</span>
-          </button>
-          {showExportMenu && (
-            <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[120px]">
+        {/* Second row: graph search bar */}
+        <div className="bg-gray-800 rounded-lg shadow-lg flex items-center px-2 py-1 gap-1">
+          <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            ref={graphSearchInputRef}
+            type="text"
+            placeholder="Search graph..."
+            value={graphSearchQuery}
+            onChange={(e) => setGraphSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.shiftKey ? handleGraphSearchPrev() : handleGraphSearchNext();
+              }
+              if (e.key === "Escape") {
+                setGraphSearchQuery("");
+                graphSearchInputRef.current?.blur();
+              }
+            }}
+            className="bg-transparent text-sm text-gray-100 placeholder-gray-500 focus:outline-none w-48"
+          />
+          {graphSearchQuery && (
+            <>
+              <span className="text-xs text-gray-400 shrink-0">
+                {graphSearchMatchIds.length > 0
+                  ? `${graphSearchIndex + 1}/${graphSearchMatchIds.length}`
+                  : "0/0"}
+              </span>
               <button
-                onClick={handleExportPNG}
-                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 rounded-t-lg"
+                onClick={handleGraphSearchPrev}
+                className="p-0.5 text-gray-400 hover:text-gray-200"
+                title="Previous match (Shift+Enter)"
               >
-                PNG
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
               </button>
               <button
-                onClick={handleExportSVG}
-                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 rounded-b-lg border-t border-gray-700"
+                onClick={handleGraphSearchNext}
+                className="p-0.5 text-gray-400 hover:text-gray-200"
+                title="Next match (Enter)"
               >
-                SVG
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
-            </div>
+              <button
+                onClick={() => setGraphSearchQuery("")}
+                className="p-0.5 text-gray-400 hover:text-gray-200"
+                title="Clear search"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </>
           )}
         </div>
 

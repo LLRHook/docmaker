@@ -22,10 +22,14 @@ export interface GraphNode {
   };
 }
 
+export type EdgeType = "extends" | "implements" | "imports" | "calls" | "contains";
+
+export const EDGE_TYPES: readonly EdgeType[] = ["extends", "implements", "imports", "calls", "contains"] as const;
+
 export interface GraphEdge {
   source: string;
   target: string;
-  type: "extends" | "implements" | "imports" | "calls" | "contains";
+  type: EdgeType;
 }
 
 export interface CodeGraph {
