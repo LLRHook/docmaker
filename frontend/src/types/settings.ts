@@ -35,6 +35,7 @@ export interface GeneralSettings {
   openLastProjectOnStartup: boolean;
   lastProjectPath: string | null;
   recentProjects: RecentProject[];
+  firstRunCompleted: boolean;
 }
 
 export interface LayoutSettings {
@@ -83,6 +84,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     openLastProjectOnStartup: false,
     lastProjectPath: null,
     recentProjects: [],
+    firstRunCompleted: false,
   },
   layout: {
     windowWidth: 1280,

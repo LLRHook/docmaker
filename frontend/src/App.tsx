@@ -8,6 +8,7 @@ import { ResizablePanel } from "./components/ResizablePanel";
 import { SettingsModal } from "./components/settings";
 import { BreadcrumbTrail } from "./components/BreadcrumbTrail";
 import { KeyboardShortcutHelp } from "./components/KeyboardShortcutHelp";
+import { OnboardingWizard } from "./components/OnboardingWizard";
 import { usePyloid } from "./hooks/usePyloid";
 import { useDropZone } from "./hooks/useDropZone";
 import { useSettings } from "./contexts/SettingsContext";
@@ -52,6 +53,7 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [detailsPanelCollapsed, setDetailsPanelCollapsed] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const graphRef = useRef<GraphViewHandle>(null);
@@ -358,9 +360,11 @@ export function App() {
     };
   }, [handleLoadProject]);
 
-  // Open last project on startup if enabled
+  // Show onboarding wizard on first run, or auto-open last project
   useEffect(() => {
-    if (
+    if (!settings.general.firstRunCompleted) {
+      setShowOnboarding(true);
+    } else if (
       settings.general.openLastProjectOnStartup &&
       settings.general.lastProjectPath &&
       !projectPath
@@ -613,6 +617,21 @@ export function App() {
             <p className="text-sm text-gray-400 mt-2">Release to start scanning</p>
           </div>
         </div>
+      )}
+
+      {/* First-run onboarding wizard */}
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={(path, loadedGraph, loadedStats) => {
+            setShowOnboarding(false);
+            setProjectPath(path);
+            setGraph(loadedGraph);
+            setStats(loadedStats);
+            setStatus("ready");
+            setStatusMessage(`Loaded ${loadedStats.classes} classes, ${loadedStats.endpoints} endpoints`);
+          }}
+          onSkip={() => setShowOnboarding(false)}
+        />
       )}
     </div>
   );
