@@ -512,6 +512,87 @@ def test_parser_extracts_class_fields(typescript_parser, sample_typescript_class
     assert "apiUrl" in field_names
 
 
+@pytest.fixture
+def sample_typescript_with_constructors():
+    """Create a sample TypeScript file with constructor instantiation calls."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ts", delete=False) as f:
+        f.write('''import { User } from "./models";
+import { Logger } from "./logger";
+
+export class UserService {
+  createUser(name: string): User {
+    const logger = new Logger("UserService");
+    const user = new User(name);
+    return user;
+  }
+}
+
+export function buildService(): UserService {
+  const service = new UserService();
+  return service;
+}
+
+const initApp = (): void => {
+  const svc = new UserService();
+};
+''')
+        f.flush()
+        yield Path(f.name)
+
+
+def test_parser_extracts_constructor_calls_in_methods(
+    typescript_parser, sample_typescript_with_constructors
+):
+    """Test that the parser extracts new expressions from methods."""
+    source_file = SourceFile(
+        path=sample_typescript_with_constructors,
+        relative_path=Path("user.service.ts"),
+        language=Language.TYPESCRIPT,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = typescript_parser.parse(source_file)
+
+    user_service = next(c for c in symbols.classes if c.name == "UserService")
+    create_user = next(m for m in user_service.methods if m.name == "createUser")
+    assert "Logger" in create_user.calls
+    assert "User" in create_user.calls
+
+
+def test_parser_extracts_constructor_calls_in_functions(
+    typescript_parser, sample_typescript_with_constructors
+):
+    """Test that the parser extracts new expressions from module functions."""
+    source_file = SourceFile(
+        path=sample_typescript_with_constructors,
+        relative_path=Path("user.service.ts"),
+        language=Language.TYPESCRIPT,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = typescript_parser.parse(source_file)
+
+    build_service = next(f for f in symbols.functions if f.name == "buildService")
+    assert "UserService" in build_service.calls
+
+
+def test_parser_extracts_constructor_calls_in_arrow_functions(
+    typescript_parser, sample_typescript_with_constructors
+):
+    """Test that the parser extracts new expressions from arrow functions."""
+    source_file = SourceFile(
+        path=sample_typescript_with_constructors,
+        relative_path=Path("user.service.ts"),
+        language=Language.TYPESCRIPT,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = typescript_parser.parse(source_file)
+
+    init_app = next(f for f in symbols.functions if f.name == "initApp")
+    assert "UserService" in init_app.calls
+
+
 def test_parser_handles_tsx_files(typescript_parser):
     """Test that the parser can handle TSX files."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".tsx", delete=False) as f:

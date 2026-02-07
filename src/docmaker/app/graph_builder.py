@@ -216,6 +216,18 @@ class GraphBuilder:
                         GraphEdge(source=class_id, target=interface_id, type="implements")
                     )
 
+        # Add calls edges from constructor instantiations
+        for cls in file_symbols.classes:
+            fqn = f"{file_symbols.package}.{cls.name}" if file_symbols.package else cls.name
+            class_id = f"class:{fqn}"
+            for method in cls.methods:
+                for callee in method.calls:
+                    target_id = self._resolve_class_id(callee, file_symbols)
+                    if target_id:
+                        graph.add_edge(
+                            GraphEdge(source=class_id, target=target_id, type="calls")
+                        )
+
         # Add import edges
         for imp in file_symbols.imports:
             if not imp.is_wildcard:
