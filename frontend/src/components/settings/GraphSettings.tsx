@@ -4,7 +4,10 @@ import {
   LAYOUT_LABELS,
   LAYOUT_QUALITY_LABELS,
   NODE_SIZING_LABELS,
+  EDGE_TYPE_LABELS,
+  EDGE_TYPE_COLORS,
 } from "../../types/settings";
+import type { EdgeTypeFilters } from "../../types/settings";
 
 export function GraphSettings() {
   const { settings, updateCategory } = useSettings();
@@ -213,6 +216,60 @@ export function GraphSettings() {
         <label htmlFor="showLabels" className="text-sm text-gray-300">
           Show Node Labels
         </label>
+      </div>
+
+      {/* Package Clustering */}
+      <div className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          id="enablePackageClustering"
+          checked={graphView.enablePackageClustering}
+          onChange={(e) => updateCategory("graphView", { enablePackageClustering: e.target.checked })}
+          className="w-4 h-4 bg-gray-700 border-gray-600 rounded text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+        />
+        <label htmlFor="enablePackageClustering" className="text-sm text-gray-300">
+          Group Nodes by Package
+        </label>
+      </div>
+      <p className="text-xs text-gray-500 -mt-4 ml-7">
+        Renders packages as compound nodes containing their classes and interfaces
+      </p>
+
+      {/* Default Edge Type Filters */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Default Edge Type Visibility
+        </label>
+        <div className="space-y-2">
+          {(Object.keys(EDGE_TYPE_LABELS) as (keyof EdgeTypeFilters)[]).map((edgeType) => (
+            <div key={edgeType} className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id={`edge-${edgeType}`}
+                checked={graphView.edgeTypeFilters[edgeType]}
+                onChange={(e) => {
+                  updateCategory("graphView", {
+                    edgeTypeFilters: {
+                      ...graphView.edgeTypeFilters,
+                      [edgeType]: e.target.checked,
+                    },
+                  });
+                }}
+                className="w-4 h-4 bg-gray-700 border-gray-600 rounded text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+              />
+              <span
+                className="w-3 h-0.5 inline-block rounded"
+                style={{ backgroundColor: EDGE_TYPE_COLORS[edgeType] }}
+              />
+              <label htmlFor={`edge-${edgeType}`} className="text-sm text-gray-300">
+                {EDGE_TYPE_LABELS[edgeType]}
+              </label>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Controls which edge types are visible by default when loading a project
+        </p>
       </div>
     </div>
   );

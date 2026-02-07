@@ -7,12 +7,14 @@ interface SidebarProps {
   onNodeSelect: (nodeId: string) => void;
   onFilterChange: (filters: FilterState) => void;
   selectedNodeId: string | null;
+  edgeTypes: Set<string>;
 }
 
 export interface FilterState {
   nodeTypes: Set<string>;
   categories: Set<string>;
   searchQuery: string;
+  edgeTypes: Set<string>;
 }
 
 const NODE_TYPES = [
@@ -40,7 +42,7 @@ export interface SidebarHandle {
 
 const COLLAPSED_KEY = "docmaker-sidebar-collapsed";
 
-export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }, ref) {
+export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId, edgeTypes }, ref) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeNodeTypes, setActiveNodeTypes] = useState<Set<string>>(
@@ -88,9 +90,10 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
         nodeTypes: activeNodeTypes,
         categories: activeCategories,
         searchQuery: "",
+        edgeTypes,
       });
     },
-  }), [nodes, activeNodeTypes, activeCategories, searchQuery, onFilterChange]);
+  }), [nodes, activeNodeTypes, activeCategories, searchQuery, edgeTypes, onFilterChange]);
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -115,6 +118,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
         nodeTypes: activeNodeTypes,
         categories: activeCategories,
         searchQuery: query,
+        edgeTypes,
       });
     }, 200);
   }, [activeNodeTypes, activeCategories, onFilterChange]);
@@ -131,6 +135,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
       nodeTypes: newTypes,
       categories: activeCategories,
       searchQuery,
+      edgeTypes,
     });
   };
 
@@ -146,6 +151,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
       nodeTypes: activeNodeTypes,
       categories: newCategories,
       searchQuery,
+      edgeTypes,
     });
   };
 

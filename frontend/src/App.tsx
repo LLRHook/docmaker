@@ -11,7 +11,7 @@ import { usePyloid } from "./hooks/usePyloid";
 import { useSettings } from "./contexts/SettingsContext";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
 import { useKeyboardNavigation, type KeyboardNavigationCallbacks } from "./hooks/useKeyboardNavigation";
-import type { CodeGraph, GraphNode } from "./types/graph";
+import type { CodeGraph, GraphNode, EdgeType } from "./types/graph";
 import {
   MIN_SIDEBAR_WIDTH,
   MIN_DETAILS_PANEL_WIDTH,
@@ -37,6 +37,7 @@ export function App() {
     nodeTypes: new Set(["class", "interface", "endpoint", "package", "file"]),
     categories: new Set(["backend", "frontend", "config", "test", "unknown"]),
     searchQuery: "",
+    edgeTypes: new Set(["extends", "implements", "imports", "calls", "contains"]),
   });
   const [showOpenMenu, setShowOpenMenu] = useState(false);
   const [showPathInput, setShowPathInput] = useState(false);
@@ -194,6 +195,18 @@ export function App() {
 
   const handleToggleDetailsPanel = useCallback(() => {
     setDetailsPanelCollapsed((prev) => !prev);
+  }, []);
+
+  const handleEdgeTypeToggle = useCallback((edgeType: EdgeType) => {
+    setFilters((prev) => {
+      const newEdgeTypes = new Set(prev.edgeTypes);
+      if (newEdgeTypes.has(edgeType)) {
+        newEdgeTypes.delete(edgeType);
+      } else {
+        newEdgeTypes.add(edgeType);
+      }
+      return { ...prev, edgeTypes: newEdgeTypes };
+    });
   }, []);
 
   const handleSidebarWidthChange = useCallback(
@@ -482,6 +495,7 @@ export function App() {
             onNodeSelect={handleNodeSelect}
             onFilterChange={setFilters}
             selectedNodeId={selectedNodeId}
+            edgeTypes={filters.edgeTypes}
           />
         </ResizablePanel>
 
@@ -493,6 +507,7 @@ export function App() {
           selectedNodeId={selectedNodeId}
           onNodeSelect={handleNodeSelect}
           onNodeDoubleClick={handleNodeDoubleClick}
+          onEdgeTypeToggle={handleEdgeTypeToggle}
         />
 
         {/* Resizable Details panel */}

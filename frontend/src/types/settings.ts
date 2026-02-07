@@ -1,3 +1,11 @@
+export interface EdgeTypeFilters {
+  extends: boolean;
+  implements: boolean;
+  imports: boolean;
+  calls: boolean;
+  contains: boolean;
+}
+
 export interface GraphViewSettings {
   scrollSpeed: number;
   zoomSensitivity: number;
@@ -7,6 +15,8 @@ export interface GraphViewSettings {
   layoutQuality: "draft" | "default" | "proof";
   nodeSizing: "fixed" | "byType" | "byDegree";
   largeGraphThreshold: number;
+  edgeTypeFilters: EdgeTypeFilters;
+  enablePackageClustering: boolean;
 }
 
 export interface AppearanceSettings {
@@ -50,6 +60,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
     layoutQuality: "default",
     nodeSizing: "byDegree",
     largeGraphThreshold: 200,
+    edgeTypeFilters: {
+      extends: true,
+      implements: true,
+      imports: true,
+      calls: true,
+      contains: true,
+    },
+    enablePackageClustering: false,
   },
   appearance: {
     fontSize: "medium",
@@ -129,4 +147,20 @@ export const NODE_SIZING_LABELS: Record<GraphViewSettings["nodeSizing"], string>
   fixed: "Fixed Size",
   byType: "By Node Type",
   byDegree: "By Connection Count",
+};
+
+export const EDGE_TYPE_LABELS: Record<keyof EdgeTypeFilters, string> = {
+  extends: "Extends",
+  implements: "Implements",
+  imports: "Imports",
+  calls: "Calls",
+  contains: "Contains",
+};
+
+export const EDGE_TYPE_COLORS: Record<keyof EdgeTypeFilters, string> = {
+  extends: "#3b82f6",
+  implements: "#a855f7",
+  imports: "#6b7280",
+  calls: "#f59e0b",
+  contains: "#4b5563",
 };
