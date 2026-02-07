@@ -590,6 +590,66 @@ class DocmakerAPI(PyloidIPC):
             logger.exception("Error resizing window")
             return json.dumps({"error": str(e)})
 
+    @Bridge(str, int, int, result=str)
+    def get_source_snippet(self, path: str, start_line: int, end_line: int) -> str:
+        """Read source code lines from a file.
+
+        Args:
+            path: Path to the source file (absolute or relative to project)
+            start_line: First line to include (1-based)
+            end_line: Last line to include (1-based, inclusive)
+
+        Returns:
+            JSON string with the source code snippet
+        """
+        logger.debug("get_source_snippet called: %s lines %d-%d", path, start_line, end_line)
+        try:
+            if not self._current_project:
+                return json.dumps({"error": "No project loaded. Call scan_project first."})
+
+            file_path = Path(path)
+            if not file_path.is_absolute():
+                file_path = self._current_project / file_path
+
+            file_path = file_path.resolve()
+
+            # Security: ensure file is within the project directory
+            try:
+                file_path.relative_to(self._current_project.resolve())
+            except ValueError:
+                return json.dumps({"error": "Path is outside the project directory"})
+
+            if not file_path.exists():
+                return json.dumps({"error": f"File not found: {path}"})
+
+            if not file_path.is_file():
+                return json.dumps({"error": f"Not a file: {path}"})
+
+            lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+
+            # Clamp line range to file bounds
+            start = max(1, start_line)
+            end = min(len(lines), end_line)
+
+            if start > len(lines):
+                return json.dumps({"error": f"Start line {start_line} exceeds file length ({len(lines)} lines)"})
+
+            snippet = "\n".join(lines[start - 1 : end])
+
+            return json.dumps(
+                {
+                    "source": snippet,
+                    "startLine": start,
+                    "endLine": end,
+                    "totalLines": len(lines),
+                    "path": str(file_path),
+                }
+            )
+
+        except Exception as e:
+            logger.exception("Error reading source snippet")
+            return json.dumps({"error": str(e)})
+
     @Bridge(result=str)
     def get_window_size(self) -> str:
         """Get the current window size.
