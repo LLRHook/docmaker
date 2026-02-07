@@ -65,7 +65,15 @@ const EDGE_STYLES: Record<string, { lineStyle: string; color: string; width: num
   contains: { lineStyle: "dotted", color: "#4b5563", width: 1 },
 };
 
-const stylesheet: StylesheetDef[] = [
+function getThemeColor(varName: string, fallback: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || fallback;
+}
+
+function buildStylesheet(): StylesheetDef[] {
+  const textColor = getThemeColor("--c-text", "#e5e7eb");
+  const outlineColor = getThemeColor("--c-surface", "#1f2937");
+
+  return [
   {
     selector: "node",
     style: {
@@ -73,8 +81,8 @@ const stylesheet: StylesheetDef[] = [
       "text-valign": "center",
       "text-halign": "center",
       "font-size": "10px",
-      color: "#e5e7eb",
-      "text-outline-color": "#1f2937",
+      color: textColor,
+      "text-outline-color": outlineColor,
       "text-outline-width": 2,
       "background-color": "data(color)",
       shape: "data(shape)",
@@ -130,6 +138,7 @@ const stylesheet: StylesheetDef[] = [
     },
   },
 ];
+}
 
 interface TooltipState {
   x: number;
@@ -153,6 +162,17 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   const containerRef = useRef<HTMLDivElement>(null);
   const { settings } = useSettings();
   const graphSettings = settings.graphView;
+  const theme = settings.appearance.theme;
+
+  // Rebuild stylesheet when theme changes
+  const stylesheet = useMemo(() => buildStylesheet(), [theme]);
+
+  // Update Cytoscape styles when theme changes
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.style(stylesheet as unknown as cytoscape.StylesheetCSS[]);
+  }, [stylesheet]);
 
   // Tooltip state
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -438,7 +458,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   const handleExportPNG = useCallback(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    const dataUri = cy.png({ bg: "#111827", full: true, scale: 2 });
+    const dataUri = cy.png({ bg: getThemeColor("--c-bg", "#111827"), full: true, scale: 2 });
     const link = document.createElement("a");
     link.href = dataUri;
     link.download = "graph.png";
@@ -449,7 +469,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   const handleExportSVG = useCallback(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    const svgStr = (cy as unknown as { svg(opts: Record<string, unknown>): string }).svg({ full: true, bg: "#111827" });
+    const svgStr = (cy as unknown as { svg(opts: Record<string, unknown>): string }).svg({ full: true, bg: getThemeColor("--c-bg", "#111827") });
     const blob = new Blob([svgStr], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -476,37 +496,37 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   }, [tooltip]);
 
   return (
-    <div ref={containerRef} className="flex-1 relative bg-gray-900">
+    <div ref={containerRef} className="flex-1 relative bg-c-bg">
       {/* Toolbar */}
       <div className="absolute top-4 left-4 z-10 flex gap-2">
-        <div className="bg-gray-800 rounded-lg shadow-lg flex">
+        <div className="bg-c-surface rounded-lg shadow-lg flex">
           <button
             onClick={() => handleLayout("fcose")}
-            className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-l-lg"
+            className="px-3 py-2 text-sm text-c-text-sub hover:bg-c-element rounded-l-lg"
             title="Force-directed layout (fCoSE)"
           >
             Force
           </button>
           <button
             onClick={() => handleLayout("circle")}
-            className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 border-l border-gray-700"
+            className="px-3 py-2 text-sm text-c-text-sub hover:bg-c-element border-l border-c-line"
             title="Circular layout"
           >
             Circle
           </button>
           <button
             onClick={() => handleLayout("grid")}
-            className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-r-lg border-l border-gray-700"
+            className="px-3 py-2 text-sm text-c-text-sub hover:bg-c-element rounded-r-lg border-l border-c-line"
             title="Grid layout"
           >
             Grid
           </button>
         </div>
 
-        <div className="bg-gray-800 rounded-lg shadow-lg flex">
+        <div className="bg-c-surface rounded-lg shadow-lg flex">
           <button
             onClick={handleZoomIn}
-            className="px-3 py-2 text-gray-300 hover:bg-gray-700 rounded-l-lg"
+            className="px-3 py-2 text-c-text-sub hover:bg-c-element rounded-l-lg"
             title="Zoom in"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -515,7 +535,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
           </button>
           <button
             onClick={handleZoomOut}
-            className="px-3 py-2 text-gray-300 hover:bg-gray-700 border-l border-gray-700"
+            className="px-3 py-2 text-c-text-sub hover:bg-c-element border-l border-c-line"
             title="Zoom out"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -524,7 +544,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
           </button>
           <button
             onClick={handleFitGraph}
-            className="px-3 py-2 text-gray-300 hover:bg-gray-700 rounded-r-lg border-l border-gray-700"
+            className="px-3 py-2 text-c-text-sub hover:bg-c-element rounded-r-lg border-l border-c-line"
             title="Fit to screen (f)"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -537,7 +557,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
         <div className="relative" ref={exportMenuRef}>
           <button
             onClick={() => setShowExportMenu(!showExportMenu)}
-            className="bg-gray-800 rounded-lg shadow-lg px-3 py-2 text-gray-300 hover:bg-gray-700 flex items-center gap-1.5"
+            className="bg-c-surface rounded-lg shadow-lg px-3 py-2 text-c-text-sub hover:bg-c-element flex items-center gap-1.5"
             title="Export graph"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -546,16 +566,16 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
             <span className="text-sm">Export</span>
           </button>
           {showExportMenu && (
-            <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[120px]">
+            <div className="absolute top-full left-0 mt-1 bg-c-surface border border-c-line rounded-lg shadow-lg z-50 min-w-[120px]">
               <button
                 onClick={handleExportPNG}
-                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 rounded-t-lg"
+                className="w-full px-3 py-2 text-left text-sm text-c-text-sub hover:bg-c-element rounded-t-lg"
               >
                 PNG
               </button>
               <button
                 onClick={handleExportSVG}
-                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 rounded-b-lg border-t border-gray-700"
+                className="w-full px-3 py-2 text-left text-sm text-c-text-sub hover:bg-c-element rounded-b-lg border-t border-c-line"
               >
                 SVG
               </button>
@@ -566,7 +586,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
         {/* Minimap toggle */}
         <button
           onClick={() => setShowMinimap(!showMinimap)}
-          className={`bg-gray-800 rounded-lg shadow-lg px-3 py-2 text-sm hover:bg-gray-700 ${showMinimap ? "text-blue-400" : "text-gray-300"}`}
+          className={`bg-c-surface rounded-lg shadow-lg px-3 py-2 text-sm hover:bg-c-element ${showMinimap ? "text-blue-400" : "text-c-text-sub"}`}
           title="Toggle minimap"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -576,32 +596,32 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 z-10 bg-gray-800 rounded-lg shadow-lg p-3">
-        <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Legend</h4>
+      <div className="absolute bottom-4 left-4 z-10 bg-c-surface rounded-lg shadow-lg p-3">
+        <h4 className="text-xs font-semibold text-c-text-dim uppercase mb-2">Legend</h4>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
           {Object.entries(NODE_COLORS).map(([type, color]) => (
             <div key={type} className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
-              <span className="text-gray-300 capitalize">{type}</span>
+              <span className="text-c-text-sub capitalize">{type}</span>
             </div>
           ))}
         </div>
-        <div className="mt-2 pt-2 border-t border-gray-700 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        <div className="mt-2 pt-2 border-t border-c-line grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
           <div className="flex items-center gap-1.5">
             <span className="w-4 h-0.5 bg-blue-500" />
-            <span className="text-gray-400">extends</span>
+            <span className="text-c-text-dim">extends</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-4 h-0.5 bg-purple-500 border-dashed" style={{ borderTopWidth: 2, borderStyle: "dashed" }} />
-            <span className="text-gray-400">implements</span>
+            <span className="text-c-text-dim">implements</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-4 h-0.5 bg-gray-500" />
-            <span className="text-gray-400">imports</span>
+            <span className="text-c-text-dim">imports</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-4 h-0.5 bg-gray-600" style={{ borderTopWidth: 2, borderStyle: "dotted" }} />
-            <span className="text-gray-400">contains</span>
+            <span className="w-4 h-0.5 bg-c-hover" style={{ borderTopWidth: 2, borderStyle: "dotted" }} />
+            <span className="text-c-text-dim">contains</span>
           </div>
         </div>
       </div>
@@ -609,7 +629,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
       {/* Tooltip */}
       {tooltip && (
         <div
-          className="absolute z-20 pointer-events-none bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 shadow-xl text-xs max-w-[220px]"
+          className="absolute z-20 pointer-events-none bg-c-surface border border-c-line-soft rounded-lg px-3 py-2 shadow-xl text-xs max-w-[220px]"
           style={{
             left: tooltip.x,
             top: tooltip.y,
@@ -621,11 +641,11 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
               className="w-2 h-2 rounded-full shrink-0"
               style={{ backgroundColor: NODE_COLORS[tooltip.nodeType] || "#6b7280" }}
             />
-            <span className="text-gray-400 capitalize">{tooltip.nodeType}</span>
+            <span className="text-c-text-dim capitalize">{tooltip.nodeType}</span>
           </div>
-          <div className="text-gray-100 font-medium truncate">{tooltip.label}</div>
+          <div className="text-c-text font-medium truncate">{tooltip.label}</div>
           {tooltipMetrics && (
-            <div className="text-gray-400 mt-0.5">{tooltipMetrics}</div>
+            <div className="text-c-text-dim mt-0.5">{tooltipMetrics}</div>
           )}
         </div>
       )}
@@ -645,7 +665,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
           maxZoom={3}
         />
       ) : (
-        <div className="flex items-center justify-center h-full text-gray-500">
+        <div className="flex items-center justify-center h-full text-c-text-faint">
           <div className="text-center">
             <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 10V3L4 14h7v7l9-11h-7z" />

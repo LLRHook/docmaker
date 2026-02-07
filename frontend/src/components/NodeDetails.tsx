@@ -52,7 +52,7 @@ function methodBgColor(method: string): string {
     PATCH: "bg-amber-900/40 border-amber-600/50",
     DELETE: "bg-red-900/40 border-red-600/50",
   };
-  return colors[method.toUpperCase()] || "bg-gray-900/40 border-gray-600/50";
+  return colors[method.toUpperCase()] || "bg-c-bg/40 border-c-line-soft/50";
 }
 
 interface NodeDetailsProps {
@@ -212,7 +212,7 @@ export const NodeDetails = memo(function NodeDetails({
       <div className="relative">
         <button
           onClick={onToggleCollapse}
-          className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-gray-800 border border-gray-700 border-r-0 rounded-l-md flex items-center justify-center text-gray-400 hover:text-gray-200 hover:bg-gray-700 z-10"
+          className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-c-surface border border-c-line border-r-0 rounded-l-md flex items-center justify-center text-c-text-dim hover:text-c-text hover:bg-c-element z-10"
           title="Expand details panel"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -226,11 +226,11 @@ export const NodeDetails = memo(function NodeDetails({
   // No node selected - show empty state with collapse button
   if (!node) {
     return (
-      <div className="w-full bg-gray-800 border-l border-gray-700 flex flex-col h-full relative">
+      <div className="w-full bg-c-surface border-l border-c-line flex flex-col h-full relative">
         {/* Collapse toggle on edge */}
         <button
           onClick={onToggleCollapse}
-          className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-16 bg-gray-800 border border-gray-700 rounded-l-md flex items-center justify-center text-gray-400 hover:text-gray-200 hover:bg-gray-700 z-10"
+          className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-16 bg-c-surface border border-c-line rounded-l-md flex items-center justify-center text-c-text-dim hover:text-c-text hover:bg-c-element z-10"
           title="Collapse details panel"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -238,7 +238,7 @@ export const NodeDetails = memo(function NodeDetails({
           </svg>
         </button>
 
-        <div className="flex items-center justify-center h-full text-gray-500">
+        <div className="flex items-center justify-center h-full text-c-text-faint">
           <div className="text-center p-6">
             <svg
               className="w-12 h-12 mx-auto mb-3 opacity-50"
@@ -254,7 +254,7 @@ export const NodeDetails = memo(function NodeDetails({
               />
             </svg>
             <p className="text-sm">Select a node to view details</p>
-            <p className="text-xs text-gray-600 mt-1">Click on a class, interface, or endpoint</p>
+            <p className="text-xs text-c-text-faint mt-1">Click on a class, interface, or endpoint</p>
           </div>
         </div>
       </div>
@@ -262,11 +262,11 @@ export const NodeDetails = memo(function NodeDetails({
   }
 
   return (
-    <div className="w-full bg-gray-800 border-l border-gray-700 flex flex-col h-full relative">
+    <div className="w-full bg-c-surface border-l border-c-line flex flex-col h-full relative">
       {/* Collapse toggle on edge */}
       <button
         onClick={onToggleCollapse}
-        className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-16 bg-gray-800 border border-gray-700 rounded-l-md flex items-center justify-center text-gray-400 hover:text-gray-200 hover:bg-gray-700 z-10"
+        className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-16 bg-c-surface border border-c-line rounded-l-md flex items-center justify-center text-c-text-dim hover:text-c-text hover:bg-c-element z-10"
         title="Collapse details panel"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -275,14 +275,14 @@ export const NodeDetails = memo(function NodeDetails({
       </button>
 
       {/* Header */}
-      <div className="p-3 border-b border-gray-700 flex items-center justify-between">
+      <div className="p-3 border-b border-c-line flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <NodeTypeIcon type={node.type} />
-          <h2 className="font-semibold text-gray-100 truncate">{node.label}</h2>
+          <h2 className="font-semibold text-c-text truncate">{node.label}</h2>
         </div>
         <button
           onClick={onClose}
-          className="p-1 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded-sm shrink-0"
+          className="p-1 text-c-text-dim hover:text-c-text hover:bg-c-element rounded-sm shrink-0"
           title="Close"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -323,7 +323,7 @@ export const NodeDetails = memo(function NodeDetails({
                     className="text-blue-400 hover:text-blue-300 hover:underline text-left break-all"
                   >
                     {node.metadata.relativePath || node.metadata.path}
-                    {node.metadata.line && <span className="text-gray-500">:{node.metadata.line}</span>}
+                    {node.metadata.line && <span className="text-c-text-faint">:{node.metadata.line}</span>}
                   </button>
                 </div>
               </Section>
@@ -337,13 +337,13 @@ export const NodeDetails = memo(function NodeDetails({
                   <Section title="Inheritance">
                     {classDetails.superclass && (
                       <div className="mb-2">
-                        <span className="text-xs text-gray-500 mr-2">extends</span>
+                        <span className="text-xs text-c-text-faint mr-2">extends</span>
                         {renderTypeLink(classDetails.superclass, "text-sm")}
                       </div>
                     )}
                     {classDetails.interfaces.length > 0 && (
                       <div>
-                        <span className="text-xs text-gray-500 mr-2">implements</span>
+                        <span className="text-xs text-c-text-faint mr-2">implements</span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {classDetails.interfaces.map((iface) => (
                             <span
@@ -369,10 +369,10 @@ export const NodeDetails = memo(function NodeDetails({
                             <AnnotationBadges annotations={field.annotations} />
                           )}
                           <div className="flex items-baseline gap-1.5">
-                            <span className="text-gray-500 text-xs">
-                              {renderTypeLink(field.type || "?", "text-gray-500")}
+                            <span className="text-c-text-faint text-xs">
+                              {renderTypeLink(field.type || "?", "text-c-text-faint")}
                             </span>
-                            <span className="text-gray-200">{field.name}</span>
+                            <span className="text-c-text">{field.name}</span>
                           </div>
                         </div>
                       ))}
@@ -391,7 +391,7 @@ export const NodeDetails = memo(function NodeDetails({
                           )}
                           <MethodSignature method={method} renderTypeLink={renderTypeLink} />
                           {method.docstring && (
-                            <p className="text-xs text-gray-500 italic mt-0.5 truncate" title={method.docstring}>
+                            <p className="text-xs text-c-text-faint italic mt-0.5 truncate" title={method.docstring}>
                               {method.docstring}
                             </p>
                           )}
@@ -400,7 +400,7 @@ export const NodeDetails = memo(function NodeDetails({
                               {method.modifiers.map((mod) => (
                                 <span
                                   key={mod}
-                                  className="text-xs text-gray-600 bg-gray-700/50 px-1 rounded"
+                                  className="text-xs text-c-text-faint bg-c-element/50 px-1 rounded"
                                 >
                                   {mod}
                                 </span>
@@ -422,19 +422,19 @@ export const NodeDetails = memo(function NodeDetails({
                 <div className={`rounded border p-3 mb-4 ${methodBgColor(endpointDetails.httpMethod)}`}>
                   <div className="flex items-center gap-2">
                     <HttpMethodBadge method={endpointDetails.httpMethod} />
-                    <span className="text-sm text-gray-100 font-mono font-medium">{endpointDetails.path}</span>
+                    <span className="text-sm text-c-text font-mono font-medium">{endpointDetails.path}</span>
                   </div>
                   {endpointDetails.description && (
-                    <p className="text-sm text-gray-400 mt-2">{endpointDetails.description}</p>
+                    <p className="text-sm text-c-text-dim mt-2">{endpointDetails.description}</p>
                   )}
                 </div>
 
                 <Section title="Handler">
                   <div className="text-sm">
                     {renderTypeLink(endpointDetails.handlerClass, "text-blue-400")}
-                    <span className="text-gray-500">.</span>
-                    <span className="text-gray-200">{endpointDetails.handlerMethod}</span>
-                    <span className="text-gray-500">()</span>
+                    <span className="text-c-text-faint">.</span>
+                    <span className="text-c-text">{endpointDetails.handlerMethod}</span>
+                    <span className="text-c-text-faint">()</span>
                   </div>
                 </Section>
 
@@ -486,11 +486,11 @@ export const NodeDetails = memo(function NodeDetails({
       </div>
 
       {/* Footer actions */}
-      <div className="p-3 border-t border-gray-700">
+      <div className="p-3 border-t border-c-line">
         <button
           onClick={handleOpenFile}
           disabled={!node.metadata.path && !node.metadata.filePath}
-          className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm rounded-sm flex items-center justify-center gap-2 transition-colors"
+          className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-c-element disabled:text-c-text-faint text-white text-sm rounded-sm flex items-center justify-center gap-2 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
@@ -527,7 +527,7 @@ function CategoryBadge({ category }: { category: string }) {
     frontend: "bg-green-900/50 text-green-300",
     config: "bg-yellow-900/50 text-yellow-300",
     test: "bg-purple-900/50 text-purple-300",
-    unknown: "bg-gray-700 text-gray-400",
+    unknown: "bg-c-element text-c-text-dim",
   };
 
   return (
@@ -548,7 +548,7 @@ function HttpMethodBadge({ method }: { method: string }) {
 
   return (
     <span
-      className={`px-2 py-0.5 text-xs font-bold rounded-sm ${colors[method.toUpperCase()] || "bg-gray-600 text-gray-100"}`}
+      className={`px-2 py-0.5 text-xs font-bold rounded-sm ${colors[method.toUpperCase()] || "bg-c-hover text-c-text"}`}
     >
       {method}
     </span>
@@ -566,8 +566,8 @@ function InfoItem({
 }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className={`text-sm text-gray-300 break-all ${mono ? "font-mono text-xs" : ""}`}>{value}</dd>
+      <dt className="text-xs text-c-text-faint">{label}</dt>
+      <dd className={`text-sm text-c-text-sub break-all ${mono ? "font-mono text-xs" : ""}`}>{value}</dd>
     </div>
   );
 }
@@ -587,7 +587,7 @@ function Section({ title, children, collapsible = false, defaultOpen = true }: S
       {collapsible ? (
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1 text-xs font-semibold text-gray-400 uppercase mb-2 hover:text-gray-300 w-full text-left"
+          className="flex items-center gap-1 text-xs font-semibold text-c-text-dim uppercase mb-2 hover:text-c-text-sub w-full text-left"
         >
           <svg
             className={`w-3 h-3 transition-transform ${isOpen ? "rotate-90" : ""}`}
@@ -600,7 +600,7 @@ function Section({ title, children, collapsible = false, defaultOpen = true }: S
           {title}
         </button>
       ) : (
-        <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">{title}</h3>
+        <h3 className="text-xs font-semibold text-c-text-dim uppercase mb-2">{title}</h3>
       )}
       {(!collapsible || isOpen) && <div className="space-y-1.5">{children}</div>}
     </div>
@@ -631,19 +631,19 @@ function MethodSignature({
 }) {
   return (
     <div className="flex items-baseline gap-1.5 flex-wrap">
-      <span className="text-gray-500 text-xs">
-        {renderTypeLink(method.returnType || "void", "text-gray-500")}
+      <span className="text-c-text-faint text-xs">
+        {renderTypeLink(method.returnType || "void", "text-c-text-faint")}
       </span>
-      <span className="text-gray-100 font-medium">{method.name}</span>
-      <span className="text-gray-500">(</span>
+      <span className="text-c-text font-medium">{method.name}</span>
+      <span className="text-c-text-faint">(</span>
       {method.parameters.map((param, i) => (
         <span key={param.name} className="text-xs">
-          {renderTypeLink(param.type || "?", "text-gray-500")}
-          <span className="text-gray-400 ml-0.5">{param.name}</span>
-          {i < method.parameters.length - 1 && <span className="text-gray-500">, </span>}
+          {renderTypeLink(param.type || "?", "text-c-text-faint")}
+          <span className="text-c-text-dim ml-0.5">{param.name}</span>
+          {i < method.parameters.length - 1 && <span className="text-c-text-faint">, </span>}
         </span>
       ))}
-      <span className="text-gray-500">)</span>
+      <span className="text-c-text-faint">)</span>
     </div>
   );
 }
@@ -663,7 +663,7 @@ function ParameterTable({
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-xs text-gray-500 border-b border-gray-700">
+        <tr className="text-xs text-c-text-faint border-b border-c-line">
           <th className="text-left py-1 pr-2 font-medium">Name</th>
           <th className="text-left py-1 pr-2 font-medium">Type</th>
           <th className="text-left py-1 font-medium">Description</th>
@@ -671,12 +671,12 @@ function ParameterTable({
       </thead>
       <tbody>
         {params.map((param) => (
-          <tr key={param.name} className="border-b border-gray-700/50">
-            <td className="py-1.5 pr-2 text-gray-200 font-mono text-xs">{param.name}</td>
-            <td className="py-1.5 pr-2 text-gray-400 text-xs">
-              {renderTypeLink(param.type || "?", "text-gray-400")}
+          <tr key={param.name} className="border-b border-c-line/50">
+            <td className="py-1.5 pr-2 text-c-text font-mono text-xs">{param.name}</td>
+            <td className="py-1.5 pr-2 text-c-text-dim text-xs">
+              {renderTypeLink(param.type || "?", "text-c-text-dim")}
             </td>
-            <td className="py-1.5 text-gray-500 text-xs">{stripAnnotationPrefix(param.description)}</td>
+            <td className="py-1.5 text-c-text-faint text-xs">{stripAnnotationPrefix(param.description)}</td>
           </tr>
         ))}
       </tbody>
@@ -703,7 +703,7 @@ function SampleJsonBlock({
         {renderTypeLink(typeName, "text-blue-400")}
       </div>
       {sampleJson && (
-        <pre className="text-xs bg-gray-900 border border-gray-700 rounded p-2 overflow-x-auto text-gray-300">
+        <pre className="text-xs bg-c-bg border border-c-line rounded p-2 overflow-x-auto text-c-text-sub">
           {sampleJson}
         </pre>
       )}
@@ -734,7 +734,7 @@ function ExampleRequestBlock({
   }
 
   return (
-    <pre className="text-xs bg-gray-900 border border-gray-700 rounded p-2 overflow-x-auto text-gray-300">
+    <pre className="text-xs bg-c-bg border border-c-line rounded p-2 overflow-x-auto text-c-text-sub">
       {lines.join("\n")}
     </pre>
   );

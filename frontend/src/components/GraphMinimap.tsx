@@ -30,7 +30,7 @@ export const GraphMinimap = memo(function GraphMinimap({ cy }: GraphMinimapProps
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
     // Background
-    ctx.fillStyle = "#1f2937";
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--c-surface").trim();
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
     const bb = cy.elements().boundingBox();
@@ -165,7 +165,7 @@ export const GraphMinimap = memo(function GraphMinimap({ cy }: GraphMinimapProps
       ref={canvasRef}
       width={WIDTH}
       height={HEIGHT}
-      className="absolute bottom-4 right-4 z-10 rounded-lg border border-gray-700 cursor-crosshair"
+      className="absolute bottom-4 right-4 z-10 rounded-lg border border-c-line cursor-crosshair"
       style={{ width: WIDTH, height: HEIGHT }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}

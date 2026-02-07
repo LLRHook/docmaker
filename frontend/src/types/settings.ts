@@ -10,6 +10,7 @@ export interface GraphViewSettings {
 }
 
 export interface AppearanceSettings {
+  theme: "dark" | "light";
   fontSize: "small" | "medium" | "large";
   uiScale: number;
 }
@@ -52,6 +53,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     largeGraphThreshold: 200,
   },
   appearance: {
+    theme: "dark",
     fontSize: "medium",
     uiScale: 100,
   },

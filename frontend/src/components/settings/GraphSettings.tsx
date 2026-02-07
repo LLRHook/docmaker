@@ -44,11 +44,11 @@ export function GraphSettings() {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-medium text-gray-100">Graph View Settings</h3>
+      <h3 className="text-lg font-medium text-c-text">Graph View Settings</h3>
 
       {/* Scroll Speed */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-c-text-sub mb-2">
           Scroll Speed
         </label>
         <div className="flex items-center gap-4">
@@ -59,13 +59,13 @@ export function GraphSettings() {
             step="0.05"
             value={graphView.scrollSpeed}
             onChange={(e) => handleScrollSpeedChange(parseFloat(e.target.value))}
-            className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            className="flex-1 h-2 bg-c-element rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
-          <span className="w-12 text-sm text-gray-400 text-right">
+          <span className="w-12 text-sm text-c-text-dim text-right">
             {graphView.scrollSpeed.toFixed(2)}
           </span>
         </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
+        <div className="flex justify-between text-xs text-c-text-faint mt-1">
           <span>Slow</span>
           <span>Fast</span>
         </div>
@@ -73,7 +73,7 @@ export function GraphSettings() {
 
       {/* Zoom Sensitivity */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-c-text-sub mb-2">
           Zoom Sensitivity
         </label>
         <div className="flex items-center gap-4">
@@ -84,9 +84,9 @@ export function GraphSettings() {
             step="0.05"
             value={graphView.zoomSensitivity}
             onChange={(e) => handleZoomSensitivityChange(parseFloat(e.target.value))}
-            className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            className="flex-1 h-2 bg-c-element rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
-          <span className="w-12 text-sm text-gray-400 text-right">
+          <span className="w-12 text-sm text-c-text-dim text-right">
             {graphView.zoomSensitivity.toFixed(2)}
           </span>
         </div>
@@ -94,7 +94,7 @@ export function GraphSettings() {
 
       {/* Default Layout */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-c-text-sub mb-2">
           Default Layout
         </label>
         <select
@@ -102,7 +102,7 @@ export function GraphSettings() {
           onChange={(e) =>
             handleLayoutChange(e.target.value as GraphViewSettings["defaultLayout"])
           }
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+          className="w-full px-3 py-2 bg-c-element border border-c-line-soft rounded-sm text-sm text-c-text focus:outline-none focus:border-blue-500"
         >
           {Object.entries(LAYOUT_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -114,7 +114,7 @@ export function GraphSettings() {
 
       {/* Layout Quality */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-c-text-sub mb-2">
           Layout Quality
         </label>
         <select
@@ -122,7 +122,7 @@ export function GraphSettings() {
           onChange={(e) =>
             handleLayoutQualityChange(e.target.value as GraphViewSettings["layoutQuality"])
           }
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+          className="w-full px-3 py-2 bg-c-element border border-c-line-soft rounded-sm text-sm text-c-text focus:outline-none focus:border-blue-500"
         >
           {Object.entries(LAYOUT_QUALITY_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -130,14 +130,14 @@ export function GraphSettings() {
             </option>
           ))}
         </select>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-c-text-faint mt-1">
           Higher quality produces better layouts but takes longer
         </p>
       </div>
 
       {/* Node Sizing */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-c-text-sub mb-2">
           Node Sizing
         </label>
         <select
@@ -145,7 +145,7 @@ export function GraphSettings() {
           onChange={(e) =>
             handleNodeSizingChange(e.target.value as GraphViewSettings["nodeSizing"])
           }
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+          className="w-full px-3 py-2 bg-c-element border border-c-line-soft rounded-sm text-sm text-c-text focus:outline-none focus:border-blue-500"
         >
           {Object.entries(NODE_SIZING_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -153,14 +153,14 @@ export function GraphSettings() {
             </option>
           ))}
         </select>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-c-text-faint mt-1">
           Nodes with more connections appear larger when using "By Connection Count"
         </p>
       </div>
 
       {/* Large Graph Threshold */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-c-text-sub mb-2">
           Large Graph Threshold
         </label>
         <div className="flex items-center gap-4">
@@ -171,20 +171,20 @@ export function GraphSettings() {
             step="25"
             value={graphView.largeGraphThreshold}
             onChange={(e) => handleLargeGraphThresholdChange(parseInt(e.target.value))}
-            className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            className="flex-1 h-2 bg-c-element rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
-          <span className="w-16 text-sm text-gray-400 text-right">
+          <span className="w-16 text-sm text-c-text-dim text-right">
             {graphView.largeGraphThreshold} nodes
           </span>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-c-text-faint mt-1">
           Animations are disabled for graphs larger than this threshold
         </p>
       </div>
 
       {/* Animation Speed */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-c-text-sub mb-2">
           Animation Speed
         </label>
         <select
@@ -192,7 +192,7 @@ export function GraphSettings() {
           onChange={(e) =>
             handleAnimationSpeedChange(e.target.value as GraphViewSettings["animationSpeed"])
           }
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+          className="w-full px-3 py-2 bg-c-element border border-c-line-soft rounded-sm text-sm text-c-text focus:outline-none focus:border-blue-500"
         >
           <option value="none">None (instant)</option>
           <option value="fast">Fast</option>
@@ -208,9 +208,9 @@ export function GraphSettings() {
           id="showLabels"
           checked={graphView.showLabels}
           onChange={(e) => handleShowLabelsChange(e.target.checked)}
-          className="w-4 h-4 bg-gray-700 border-gray-600 rounded text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+          className="w-4 h-4 bg-c-element border-c-line-soft rounded text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
         />
-        <label htmlFor="showLabels" className="text-sm text-gray-300">
+        <label htmlFor="showLabels" className="text-sm text-c-text-sub">
           Show Node Labels
         </label>
       </div>
