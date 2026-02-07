@@ -275,6 +275,7 @@ class JavaParser(BaseParser):
         return_type = None
         parameters = []
         docstring = None
+        body = None
 
         annotations = self._extract_annotations(node, content)
         modifiers = self._extract_modifiers(node, content)
@@ -287,6 +288,8 @@ class JavaParser(BaseParser):
                     return_type = self._get_node_text(child, content)
             elif child.type == "formal_parameters":
                 parameters = self._parse_parameters(child, content)
+            elif child.type == "block":
+                body = child
 
         prev_sibling = node.prev_sibling
         if prev_sibling and prev_sibling.type in ("block_comment", "line_comment"):
@@ -294,6 +297,8 @@ class JavaParser(BaseParser):
 
         if not name:
             return None
+
+        calls = self._extract_constructor_calls(body, content) if body else []
 
         return FunctionDef(
             name=name,
@@ -306,6 +311,7 @@ class JavaParser(BaseParser):
             annotations=annotations,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
 
     def _parse_constructor(self, node: Node, content: str, file_path: Path) -> FunctionDef | None:
@@ -313,6 +319,7 @@ class JavaParser(BaseParser):
         name = None
         parameters = []
         docstring = None
+        body = None
 
         annotations = self._extract_annotations(node, content)
         modifiers = self._extract_modifiers(node, content)
@@ -322,6 +329,8 @@ class JavaParser(BaseParser):
                 name = self._get_node_text(child, content)
             elif child.type == "formal_parameters":
                 parameters = self._parse_parameters(child, content)
+            elif child.type == "constructor_body":
+                body = child
 
         prev_sibling = node.prev_sibling
         if prev_sibling and prev_sibling.type in ("block_comment", "line_comment"):
@@ -329,6 +338,8 @@ class JavaParser(BaseParser):
 
         if not name:
             return None
+
+        calls = self._extract_constructor_calls(body, content) if body else []
 
         return FunctionDef(
             name=name,
@@ -341,7 +352,39 @@ class JavaParser(BaseParser):
             annotations=annotations,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
+
+    def _extract_constructor_calls(self, node: Node, content: str) -> list[str]:
+        """Extract constructor instantiation calls (new ClassName()) from a method body."""
+        calls: list[str] = []
+        self._find_constructor_calls(node, content, calls)
+        return calls
+
+    def _find_constructor_calls(self, node: Node, content: str, calls: list[str]) -> None:
+        """Recursively find object_creation_expression nodes."""
+        if node.type == "object_creation_expression":
+            for child in node.children:
+                if child.type == "type_identifier":
+                    class_name = self._get_node_text(child, content)
+                    if class_name not in calls:
+                        calls.append(class_name)
+                elif child.type == "scoped_type_identifier":
+                    class_name = self._get_node_text(child, content)
+                    if class_name not in calls:
+                        calls.append(class_name)
+                elif child.type == "generic_type":
+                    # Extract base type from generic (e.g., ArrayList from ArrayList<String>)
+                    for subchild in child.children:
+                        if subchild.type == "type_identifier":
+                            class_name = self._get_node_text(subchild, content)
+                            if class_name not in calls:
+                                calls.append(class_name)
+                            break
+            return
+
+        for child in node.children:
+            self._find_constructor_calls(child, content, calls)
 
     def _parse_parameters(self, node: Node, content: str) -> list[Parameter]:
         """Parse method parameters."""

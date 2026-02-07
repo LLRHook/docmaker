@@ -384,6 +384,14 @@ class TypeScriptParser(BaseParser):
         if not name:
             return None
 
+        body = None
+        for child in node.children:
+            if child.type == "statement_block":
+                body = child
+                break
+
+        calls = self._extract_constructor_calls(body, content) if body else []
+
         return FunctionDef(
             name=name,
             file_path=file_path,
@@ -395,6 +403,7 @@ class TypeScriptParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
 
     def _extract_module_functions(
@@ -461,6 +470,14 @@ class TypeScriptParser(BaseParser):
         if not name:
             return None
 
+        body = None
+        for child in node.children:
+            if child.type == "statement_block":
+                body = child
+                break
+
+        calls = self._extract_constructor_calls(body, content) if body else []
+
         return FunctionDef(
             name=name,
             file_path=file_path,
@@ -472,6 +489,7 @@ class TypeScriptParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
 
     def _extract_arrow_functions(
@@ -524,6 +542,14 @@ class TypeScriptParser(BaseParser):
             elif child.type == "async":
                 modifiers.append("async")
 
+        body = None
+        for child in node.children:
+            if child.type == "statement_block":
+                body = child
+                break
+
+        calls = self._extract_constructor_calls(body, content) if body else []
+
         return FunctionDef(
             name=name,
             file_path=file_path,
@@ -534,7 +560,33 @@ class TypeScriptParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
+
+    def _extract_constructor_calls(self, node: Node | None, content: str) -> list[str]:
+        """Extract constructor instantiation calls (new ClassName()) from a body."""
+        if node is None:
+            return []
+        calls: list[str] = []
+        self._find_constructor_calls(node, content, calls)
+        return calls
+
+    def _find_constructor_calls(self, node: Node, content: str, calls: list[str]) -> None:
+        """Recursively find new_expression nodes."""
+        if node.type == "new_expression":
+            for child in node.children:
+                if child.type == "identifier":
+                    class_name = self._get_node_text(child, content)
+                    if class_name not in calls:
+                        calls.append(class_name)
+                elif child.type == "member_expression":
+                    class_name = self._get_node_text(child, content)
+                    if class_name not in calls:
+                        calls.append(class_name)
+            return
+
+        for child in node.children:
+            self._find_constructor_calls(child, content, calls)
 
     def _parse_parameters(self, node: Node, content: str) -> list[Parameter]:
         """Parse function parameters."""
