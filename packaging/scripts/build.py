@@ -8,7 +8,6 @@ This script handles the complete build process:
 """
 
 import argparse
-import os
 import platform
 import shutil
 import subprocess
@@ -142,11 +141,11 @@ def report_output():
 
     print("\nTo run:")
     if plat == "windows":
-        print(f'  .\\dist\\Docmaker\\Docmaker.exe')
+        print('  .\\dist\\Docmaker\\Docmaker.exe')
     elif plat == "macos":
-        print(f"  open dist/Docmaker.app")
+        print("  open dist/Docmaker.app")
     else:
-        print(f"  ./dist/Docmaker/Docmaker")
+        print("  ./dist/Docmaker/Docmaker")
 
 
 def get_dir_size(path: Path) -> float:

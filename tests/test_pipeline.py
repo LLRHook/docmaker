@@ -2,15 +2,12 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from docmaker.config import DocmakerConfig
 from docmaker.models import (
-    ClassDef,
     FileCategory,
-    FileSymbols,
     Language,
     SourceFile,
     SymbolTable,

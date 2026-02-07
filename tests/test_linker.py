@@ -7,7 +7,6 @@ import pytest
 from docmaker.generator.linker import ImportLinker
 from docmaker.models import (
     ClassDef,
-    EndpointDef,
     FileCategory,
     FileSymbols,
     FunctionDef,

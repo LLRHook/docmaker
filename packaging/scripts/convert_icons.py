@@ -14,7 +14,6 @@ Install with: pip install playwright && playwright install chromium
 """
 
 import argparse
-import asyncio
 import io
 import struct
 import subprocess

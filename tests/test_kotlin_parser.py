@@ -4,9 +4,9 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from docmaker.parser.kotlin_parser import KotlinParser
 
 from docmaker.models import FileCategory, Language, SourceFile
+from docmaker.parser.kotlin_parser import KotlinParser
 
 
 @pytest.fixture

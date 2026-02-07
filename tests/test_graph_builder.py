@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from docmaker.app.graph_builder import CodeGraph, GraphBuilder, GraphEdge, GraphNode
+from docmaker.app.graph_builder import GraphBuilder
 from docmaker.models import (
     Annotation,
     ClassDef,
