@@ -90,6 +90,7 @@ class FunctionDef:
     modifiers: list[str] = field(default_factory=list)
     source_code: str = ""
     calls: list[str] = field(default_factory=list)
+    summary: str | None = None
 
 
 @dataclass
@@ -109,6 +110,7 @@ class ClassDef:
     methods: list[FunctionDef] = field(default_factory=list)
     fields: list["FieldDef"] = field(default_factory=list)
     source_code: str = ""
+    summary: str | None = None
 
 
 @dataclass
