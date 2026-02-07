@@ -347,6 +347,7 @@ export function usePyloid() {
     } catch (error) {
       logger.error("getSourceSnippet failed:", error);
       return {
+        source: "",
         lines: [],
         startLine,
         endLine,

@@ -109,6 +109,7 @@ export interface MethodInfo {
 }
 
 export interface SourceSnippet {
+  source: string;
   lines: string[];
   startLine: number;
   endLine: number;
