@@ -8,6 +8,7 @@ import { SettingsModal } from "./components/settings";
 import { BreadcrumbTrail } from "./components/BreadcrumbTrail";
 import { KeyboardShortcutHelp } from "./components/KeyboardShortcutHelp";
 import { usePyloid } from "./hooks/usePyloid";
+import { useDropZone } from "./hooks/useDropZone";
 import { useSettings } from "./contexts/SettingsContext";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
 import { useKeyboardNavigation, type KeyboardNavigationCallbacks } from "./hooks/useKeyboardNavigation";
@@ -297,6 +298,13 @@ export function App() {
 
   useKeyboardNavigation(keyboardCallbacks);
 
+  // Drag-and-drop folder loading
+  const { isDragging } = useDropZone({
+    onDrop: useCallback((path: string) => {
+      handleLoadProject(path);
+    }, [handleLoadProject]),
+  });
+
   // Handle project load from CLI argument
   useEffect(() => {
     // Check for load-project event from Pyloid
@@ -540,6 +548,19 @@ export function App() {
 
       {/* Keyboard shortcut help overlay */}
       <KeyboardShortcutHelp isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
+
+      {/* Drag-and-drop overlay */}
+      {isDragging && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/80 pointer-events-none">
+          <div className="border-2 border-dashed border-blue-400 rounded-xl p-12 text-center">
+            <svg className="w-16 h-16 mx-auto mb-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <p className="text-xl font-medium text-blue-300">Drop folder to open project</p>
+            <p className="text-sm text-gray-400 mt-2">Release to start scanning</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
