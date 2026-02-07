@@ -40,6 +40,25 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/*
+ * Light theme: swap gray scale so existing Tailwind gray-* classes
+ * produce light-mode colors without changing any JSX.
+ * Dark theme is the default Tailwind palette.
+ */
+[data-theme="light"] {
+  --color-gray-50: #111827;
+  --color-gray-100: #1f2937;
+  --color-gray-200: #374151;
+  --color-gray-300: #4b5563;
+  --color-gray-400: #6b7280;
+  --color-gray-500: #9ca3af;
+  --color-gray-600: #d1d5db;
+  --color-gray-700: #e5e7eb;
+  --color-gray-800: #f3f4f6;
+  --color-gray-900: #f9fafb;
+  --color-gray-950: #ffffff;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -52,23 +71,23 @@ body {
   overflow: hidden;
 }
 
-/* Scrollbar styling */
+/* Scrollbar styling - uses gray scale which adapts to theme */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: var(--color-gray-800, #1f2937);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: var(--color-gray-600, #4b5563);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: var(--color-gray-500, #6b7280);
 }
 
 /* Cytoscape container */

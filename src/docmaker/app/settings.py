@@ -23,6 +23,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "appearance": {
         "fontSize": "medium",
         "uiScale": 100,
+        "theme": "dark",
     },
     "editor": {
         "preferredEditor": "auto",
@@ -32,6 +33,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "general": {
         "openLastProjectOnStartup": False,
         "lastProjectPath": None,
+        "recentProjects": [],
+        "hasCompletedOnboarding": False,
     },
     "layout": {
         "windowWidth": 1280,

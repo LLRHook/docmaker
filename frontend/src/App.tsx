@@ -323,6 +323,12 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Apply theme to document
+  useEffect(() => {
+    const theme = settings.appearance.theme;
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [settings.appearance.theme]);
+
   // Keyboard shortcut: Ctrl+, to open settings
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

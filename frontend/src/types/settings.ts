@@ -12,6 +12,7 @@ export interface GraphViewSettings {
 export interface AppearanceSettings {
   fontSize: "small" | "medium" | "large";
   uiScale: number;
+  theme: "dark" | "light";
 }
 
 export interface EditorSettings {
@@ -20,9 +21,17 @@ export interface EditorSettings {
   alwaysAsk: boolean;
 }
 
+export interface RecentProject {
+  path: string;
+  name: string;
+  lastOpened: string;
+}
+
 export interface GeneralSettings {
   openLastProjectOnStartup: boolean;
   lastProjectPath: string | null;
+  recentProjects: RecentProject[];
+  hasCompletedOnboarding: boolean;
 }
 
 export interface LayoutSettings {
@@ -54,6 +63,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   appearance: {
     fontSize: "medium",
     uiScale: 100,
+    theme: "dark",
   },
   editor: {
     preferredEditor: "auto",
@@ -63,6 +73,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   general: {
     openLastProjectOnStartup: false,
     lastProjectPath: null,
+    recentProjects: [],
+    hasCompletedOnboarding: false,
   },
   layout: {
     windowWidth: 1280,
@@ -130,3 +142,10 @@ export const NODE_SIZING_LABELS: Record<GraphViewSettings["nodeSizing"], string>
   byType: "By Node Type",
   byDegree: "By Connection Count",
 };
+
+export const THEME_LABELS: Record<AppearanceSettings["theme"], string> = {
+  dark: "Dark",
+  light: "Light",
+};
+
+export const MAX_RECENT_PROJECTS = 10;
