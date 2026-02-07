@@ -520,7 +520,7 @@ class MarkdownGenerator:
             lines = []
 
             lines.append("---")
-            lines.append(f"title: \"{pkg}\"")
+            lines.append(f'title: "{pkg}"')
             lines.append("type: moc")
             lines.append(f"generated: {datetime.now().isoformat()}")
             lines.append("---\n")

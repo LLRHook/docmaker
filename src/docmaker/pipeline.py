@@ -159,9 +159,7 @@ class Pipeline:
         functions = [
             (func, None)
             for func in self.symbol_table.function_index.values()
-            if not any(
-                func in cls.methods for cls in self.symbol_table.class_index.values()
-            )
+            if not any(func in cls.methods for cls in self.symbol_table.class_index.values())
         ]
         for cls in classes:
             for method in cls.methods:

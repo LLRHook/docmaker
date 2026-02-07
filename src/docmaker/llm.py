@@ -100,9 +100,7 @@ class LLMProvider(ABC):
                 ", ".join(f"@{a.name}" for a in cls.annotations) if cls.annotations else "None"
             ),
             fields=", ".join(f.name for f in cls.fields) if cls.fields else "None",
-            methods=(
-                ", ".join(m.name for m in cls.methods) if cls.methods else "None"
-            ),
+            methods=(", ".join(m.name for m in cls.methods) if cls.methods else "None"),
             source_code=cls.source_code[:3000],
         )
         return self.summarize(prompt)
@@ -112,14 +110,12 @@ class LLMProvider(ABC):
         prompt = FUNCTION_SUMMARY_PROMPT.format(
             function_name=func.name,
             class_name=class_name or "N/A (module-level)",
-            parameters=", ".join(
-                f"{p.name}: {p.type or 'Any'}" for p in func.parameters
-            ) if func.parameters else "None",
+            parameters=", ".join(f"{p.name}: {p.type or 'Any'}" for p in func.parameters)
+            if func.parameters
+            else "None",
             return_type=func.return_type or "None",
             annotations=(
-                ", ".join(f"@{a.name}" for a in func.annotations)
-                if func.annotations
-                else "None"
+                ", ".join(f"@{a.name}" for a in func.annotations) if func.annotations else "None"
             ),
             source_code=func.source_code[:3000],
         )
@@ -267,10 +263,7 @@ class LMStudioProvider(LLMProvider):
                 response.raise_for_status()
                 result = response.json()
                 return (
-                    result.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content", "")
-                    .strip()
+                    result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                 ) or None
         except Exception as e:
             logger.warning(f"LLM summarization failed: {e}")
@@ -340,10 +333,7 @@ class OpenAIProvider(LLMProvider):
                 response.raise_for_status()
                 result = response.json()
                 return (
-                    result.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content", "")
-                    .strip()
+                    result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                 ) or None
         except Exception as e:
             logger.warning(f"LLM summarization failed: {e}")
@@ -434,9 +424,7 @@ class SymbolSummarizer:
             return None
         return self.provider.summarize_class(cls)
 
-    def summarize_function(
-        self, func: FunctionDef, class_name: str | None = None
-    ) -> str | None:
+    def summarize_function(self, func: FunctionDef, class_name: str | None = None) -> str | None:
         """Generate a summary for a function/method definition."""
         if not self.config.enabled or not self.is_available():
             return None
