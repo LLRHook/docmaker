@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { memo, useState, useMemo, useRef, useCallback } from "react";
 import type { GraphNode } from "../types/graph";
+import { markStart, markEnd } from "../utils/perf";
 
 interface SidebarProps {
   nodes: GraphNode[];
@@ -32,7 +33,7 @@ const CATEGORIES = [
 
 const COLLAPSED_KEY = "docmaker-sidebar-collapsed";
 
-export function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeNodeTypes, setActiveNodeTypes] = useState<Set<string>>(
     new Set(NODE_TYPES.map((t) => t.id))
@@ -61,14 +62,19 @@ export function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }:
     });
   };
 
-  const handleSearchChange = (query: string) => {
+  const debounceTimer = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);
-    onFilterChange({
-      nodeTypes: activeNodeTypes,
-      categories: activeCategories,
-      searchQuery: query,
-    });
-  };
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      onFilterChange({
+        nodeTypes: activeNodeTypes,
+        categories: activeCategories,
+        searchQuery: query,
+      });
+    }, 200);
+  }, [activeNodeTypes, activeCategories, onFilterChange]);
 
   const toggleNodeType = (typeId: string) => {
     const newTypes = new Set(activeNodeTypes);
@@ -100,29 +106,34 @@ export function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }:
     });
   };
 
-  // Filter nodes based on current filters
-  const filteredNodes = nodes.filter((node) => {
-    if (!activeNodeTypes.has(node.type)) return false;
-    const category = node.metadata.category || "unknown";
-    if (!activeCategories.has(category)) return false;
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      return (
-        node.label.toLowerCase().includes(lowerQuery) ||
-        (node.metadata.fqn?.toLowerCase().includes(lowerQuery) ?? false)
-      );
-    }
-    return true;
-  });
+  // Filter and group nodes (memoized to avoid recalculation on unrelated renders)
+  const { filteredNodes, nodesByType } = useMemo(() => {
+    markStart("sidebar:filter");
+    const filtered = nodes.filter((node) => {
+      if (!activeNodeTypes.has(node.type)) return false;
+      const category = node.metadata.category || "unknown";
+      if (!activeCategories.has(category)) return false;
+      if (searchQuery) {
+        const lowerQuery = searchQuery.toLowerCase();
+        return (
+          node.label.toLowerCase().includes(lowerQuery) ||
+          (node.metadata.fqn?.toLowerCase().includes(lowerQuery) ?? false)
+        );
+      }
+      return true;
+    });
 
-  // Group nodes by type for the list
-  const nodesByType = NODE_TYPES.reduce(
-    (acc, type) => {
-      acc[type.id] = filteredNodes.filter((n) => n.type === type.id);
-      return acc;
-    },
-    {} as Record<string, GraphNode[]>
-  );
+    const grouped = NODE_TYPES.reduce(
+      (acc, type) => {
+        acc[type.id] = filtered.filter((n) => n.type === type.id);
+        return acc;
+      },
+      {} as Record<string, GraphNode[]>
+    );
+
+    markEnd("sidebar:filter");
+    return { filteredNodes: filtered, nodesByType: grouped };
+  }, [nodes, activeNodeTypes, activeCategories, searchQuery]);
 
   return (
     <div className="w-full bg-gray-800 border-r border-gray-700 flex flex-col h-full">
@@ -225,4 +236,4 @@ export function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }:
       </div>
     </div>
   );
-}
+});

@@ -64,3 +64,11 @@ CLAUDE.md
 packaging/icons/*.ico
 packaging/icons/*.icns
 packaging/icons/*.png
+
+# Test artifacts
+frontend/test-results/
+frontend/playwright-report/
+
+# Misc
+plan.md
+nul

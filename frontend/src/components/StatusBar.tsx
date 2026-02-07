@@ -38,7 +38,7 @@ export function StatusBar({ projectPath, stats, status, message }: StatusBarProp
               : ""
           }`}
         />
-        <span className="text-gray-400">{message || statusLabels[status]}</span>
+        <span className="text-gray-400" data-testid="status-message">{message || statusLabels[status]}</span>
       </div>
 
       <div className="flex-1" />

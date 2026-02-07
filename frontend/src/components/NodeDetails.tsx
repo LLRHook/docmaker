@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { memo, useEffect, useState, useCallback, useMemo } from "react";
 import type { GraphNode, ClassDetails, EndpointDetails, FieldInfo, CategorizedParameter, ParameterCategory } from "../types/graph";
 import { usePyloid } from "../hooks/usePyloid";
 
@@ -65,7 +65,7 @@ interface NodeDetailsProps {
   allNodes: GraphNode[];
 }
 
-export function NodeDetails({
+export const NodeDetails = memo(function NodeDetails({
   node,
   isCollapsed,
   onToggleCollapse,
@@ -498,7 +498,7 @@ export function NodeDetails({
       </div>
     </div>
   );
-}
+});
 
 // --- Helper Components ---
 
