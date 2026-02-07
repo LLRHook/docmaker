@@ -1,6 +1,7 @@
 """Parser module for extracting symbols from source code."""
 
 from docmaker.parser.base import BaseParser
+from docmaker.parser.go_parser import GoParser
 from docmaker.parser.java_parser import JavaParser
 from docmaker.parser.javascript_parser import JavaScriptParser
 from docmaker.parser.kotlin_parser import KotlinParser
@@ -10,6 +11,7 @@ from docmaker.parser.typescript_parser import TypeScriptParser
 
 __all__ = [
     "BaseParser",
+    "GoParser",
     "JavaParser",
     "JavaScriptParser",
     "KotlinParser",
