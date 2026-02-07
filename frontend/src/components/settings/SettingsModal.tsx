@@ -151,13 +151,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
       onClick={handleBackdropClick}
     >
-      <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl w-[700px] max-h-[80vh] flex flex-col">
+      <div className="bg-c-surface border border-c-line rounded-lg shadow-xl w-[700px] max-h-[80vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-100">Settings</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-c-line">
+          <h2 className="text-lg font-semibold text-c-text">Settings</h2>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded"
+            className="p-1 text-c-text-dim hover:text-c-text hover:bg-c-element rounded"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -173,15 +173,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         {/* Content */}
         <div className="flex flex-1 min-h-0">
           {/* Sidebar */}
-          <nav className="w-48 border-r border-gray-700 py-4">
+          <nav className="w-48 border-r border-c-line py-4">
             {TAB_CONFIG.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                   activeTab === tab.id
-                    ? "bg-gray-700 text-white border-l-2 border-blue-500"
-                    : "text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 border-l-2 border-transparent"
+                    ? "bg-c-element text-white border-l-2 border-blue-500"
+                    : "text-c-text-dim hover:text-c-text hover:bg-c-element/50 border-l-2 border-transparent"
                 }`}
               >
                 {tab.icon}
@@ -193,7 +193,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           {/* Tab Content */}
           <div className="flex-1 p-6 overflow-y-auto">
             {isLoading ? (
-              <div className="flex items-center justify-center h-40 text-gray-500">
+              <div className="flex items-center justify-center h-40 text-c-text-faint">
                 <svg
                   className="w-6 h-6 animate-spin"
                   fill="none"
@@ -221,11 +221,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-c-line">
           <button
             onClick={handleResetSettings}
             disabled={isResetting}
-            className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded disabled:opacity-50"
+            className="px-4 py-2 text-sm text-c-text-dim hover:text-c-text hover:bg-c-element rounded disabled:opacity-50"
           >
             {isResetting ? "Resetting..." : "Reset to Defaults"}
           </button>

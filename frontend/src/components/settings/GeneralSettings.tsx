@@ -14,7 +14,7 @@ export function GeneralSettings() {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-medium text-gray-100">General Settings</h3>
+      <h3 className="text-lg font-medium text-c-text">General Settings</h3>
 
       {/* Open Last Project on Startup */}
       <div>
@@ -24,13 +24,13 @@ export function GeneralSettings() {
             id="openLastProject"
             checked={general.openLastProjectOnStartup}
             onChange={(e) => handleOpenLastProjectChange(e.target.checked)}
-            className="mt-1 w-4 h-4 bg-gray-700 border-gray-600 rounded text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+            className="mt-1 w-4 h-4 bg-c-element border-c-line-soft rounded text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
           />
           <div>
-            <label htmlFor="openLastProject" className="text-sm text-gray-300 font-medium">
+            <label htmlFor="openLastProject" className="text-sm text-c-text-sub font-medium">
               Open last project on startup
             </label>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-c-text-faint mt-1">
               Automatically load the most recently opened project when the application starts
             </p>
           </div>
@@ -39,17 +39,17 @@ export function GeneralSettings() {
 
       {/* Last Project Path */}
       {general.lastProjectPath && (
-        <div className="p-3 bg-gray-700/50 rounded-sm">
+        <div className="p-3 bg-c-element/50 rounded-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-400">Last opened project:</p>
-              <p className="text-sm text-gray-300 font-mono truncate max-w-xs">
+              <p className="text-xs text-c-text-dim">Last opened project:</p>
+              <p className="text-sm text-c-text-sub font-mono truncate max-w-xs">
                 {general.lastProjectPath}
               </p>
             </div>
             <button
               onClick={handleClearLastProject}
-              className="px-2 py-1 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-600 rounded"
+              className="px-2 py-1 text-xs text-c-text-dim hover:text-c-text hover:bg-c-hover rounded"
             >
               Clear
             </button>

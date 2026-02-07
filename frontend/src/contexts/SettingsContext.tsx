@@ -197,6 +197,18 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     logger.info("Settings reset to defaults (local)");
   }, []);
 
+  // Apply theme class to <html> element
+  useEffect(() => {
+    const root = document.documentElement;
+    if (settings.appearance.theme === "light") {
+      root.classList.remove("dark");
+      root.classList.add("light");
+    } else {
+      root.classList.remove("light");
+      root.classList.add("dark");
+    }
+  }, [settings.appearance.theme]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {

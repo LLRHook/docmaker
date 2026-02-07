@@ -53,12 +53,12 @@ export const BreadcrumbTrail = memo(function BreadcrumbTrail({
   const hasOverflow = overflowEntries.length > 0;
 
   return (
-    <div className="h-8 bg-gray-800 border-b border-gray-700 flex items-center px-3 gap-1 text-xs shrink-0">
+    <div className="h-8 bg-c-surface border-b border-c-line flex items-center px-3 gap-1 text-xs shrink-0">
       {/* Back button */}
       <button
         onClick={onGoBack}
         disabled={!canGoBack}
-        className="p-1 text-gray-400 hover:text-gray-200 disabled:opacity-30 disabled:cursor-default"
+        className="p-1 text-c-text-dim hover:text-c-text disabled:opacity-30 disabled:cursor-default"
         title="Back (Alt+Left)"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -70,7 +70,7 @@ export const BreadcrumbTrail = memo(function BreadcrumbTrail({
       <button
         onClick={onGoForward}
         disabled={!canGoForward}
-        className="p-1 text-gray-400 hover:text-gray-200 disabled:opacity-30 disabled:cursor-default"
+        className="p-1 text-c-text-dim hover:text-c-text disabled:opacity-30 disabled:cursor-default"
         title="Forward (Alt+Right)"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -78,19 +78,19 @@ export const BreadcrumbTrail = memo(function BreadcrumbTrail({
         </svg>
       </button>
 
-      <span className="w-px h-4 bg-gray-700 mx-1" />
+      <span className="w-px h-4 bg-c-element mx-1" />
 
       {/* Overflow dropdown */}
       {hasOverflow && (
         <div className="relative" ref={overflowRef}>
           <button
             onClick={() => setShowOverflow(!showOverflow)}
-            className="px-1.5 py-0.5 text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded"
+            className="px-1.5 py-0.5 text-c-text-dim hover:text-c-text hover:bg-c-element rounded"
           >
             ...
           </button>
           {showOverflow && (
-            <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg z-50 min-w-[160px]">
+            <div className="absolute top-full left-0 mt-1 bg-c-surface border border-c-line rounded shadow-lg z-50 min-w-[160px]">
               {overflowEntries.map((entry, i) => (
                 <button
                   key={i}
@@ -98,10 +98,10 @@ export const BreadcrumbTrail = memo(function BreadcrumbTrail({
                     onGoTo(i);
                     setShowOverflow(false);
                   }}
-                  className="w-full px-3 py-1.5 text-left text-xs hover:bg-gray-700 flex items-center gap-2"
+                  className="w-full px-3 py-1.5 text-left text-xs hover:bg-c-element flex items-center gap-2"
                 >
                   <span className={`w-2 h-2 rounded-full shrink-0 ${NODE_COLORS[entry.type] || "bg-gray-500"}`} />
-                  <span className="truncate text-gray-300">{entry.label}</span>
+                  <span className="truncate text-c-text-sub">{entry.label}</span>
                 </button>
               ))}
             </div>
@@ -119,8 +119,8 @@ export const BreadcrumbTrail = memo(function BreadcrumbTrail({
             onClick={() => onGoTo(actualIndex)}
             className={`px-2 py-0.5 rounded flex items-center gap-1.5 max-w-[140px] ${
               isCurrent
-                ? "bg-gray-600 text-gray-100"
-                : "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                ? "bg-c-hover text-c-text"
+                : "text-c-text-dim hover:text-c-text hover:bg-c-element"
             }`}
             title={entry.label}
           >
@@ -135,7 +135,7 @@ export const BreadcrumbTrail = memo(function BreadcrumbTrail({
       {/* Clear button */}
       <button
         onClick={onClear}
-        className="p-1 text-gray-500 hover:text-gray-300"
+        className="p-1 text-c-text-faint hover:text-c-text-sub"
         title="Clear history"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

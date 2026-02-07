@@ -24,6 +24,7 @@ export interface GraphViewSettings {
 }
 
 export interface AppearanceSettings {
+  theme: "dark" | "light";
   fontSize: "small" | "medium" | "large";
   uiScale: number;
 }
@@ -82,6 +83,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enablePackageClustering: false,
   },
   appearance: {
+    theme: "dark",
     fontSize: "medium",
     uiScale: 100,
   },
