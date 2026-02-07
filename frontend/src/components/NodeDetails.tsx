@@ -1,5 +1,5 @@
 import { memo, useEffect, useState, useCallback, useMemo } from "react";
-import type { GraphNode, ClassDetails, EndpointDetails, FieldInfo, CategorizedParameter, ParameterCategory } from "../types/graph";
+import type { GraphNode, ClassDetails, EndpointDetails, FieldInfo, MethodInfo, CategorizedParameter, ParameterCategory, AnnotationInfo } from "../types/graph";
 import { usePyloid } from "../hooks/usePyloid";
 
 function getDefaultForType(javaType: string): unknown {
@@ -364,11 +364,16 @@ export const NodeDetails = memo(function NodeDetails({
                   <Section title={`Fields (${classDetails.fields.length})`} collapsible defaultOpen={false}>
                     <div className="space-y-1.5">
                       {classDetails.fields.map((field) => (
-                        <div key={field.name} className="text-sm flex items-baseline gap-1.5">
-                          <span className="text-gray-500 text-xs">
-                            {renderTypeLink(field.type || "?", "text-gray-500")}
-                          </span>
-                          <span className="text-gray-200">{field.name}</span>
+                        <div key={field.name} className="text-sm">
+                          {field.annotations && field.annotations.length > 0 && (
+                            <AnnotationBadges annotations={field.annotations} />
+                          )}
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-gray-500 text-xs">
+                              {renderTypeLink(field.type || "?", "text-gray-500")}
+                            </span>
+                            <span className="text-gray-200">{field.name}</span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -381,13 +386,15 @@ export const NodeDetails = memo(function NodeDetails({
                     <div className="space-y-2">
                       {classDetails.methods.map((method) => (
                         <div key={`${method.name}-${method.line}`} className="text-sm">
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-gray-500 text-xs">
-                              {renderTypeLink(method.returnType || "void", "text-gray-500")}
-                            </span>
-                            <span className="text-gray-100 font-medium">{method.name}</span>
-                            <span className="text-gray-500">()</span>
-                          </div>
+                          {method.annotations && method.annotations.length > 0 && (
+                            <AnnotationBadges annotations={method.annotations} />
+                          )}
+                          <MethodSignature method={method} renderTypeLink={renderTypeLink} />
+                          {method.docstring && (
+                            <p className="text-xs text-gray-500 italic mt-0.5 truncate" title={method.docstring}>
+                              {method.docstring}
+                            </p>
+                          )}
                           {method.modifiers.length > 0 && (
                             <div className="flex gap-1 mt-0.5">
                               {method.modifiers.map((mod) => (
@@ -596,6 +603,47 @@ function Section({ title, children, collapsible = false, defaultOpen = true }: S
         <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">{title}</h3>
       )}
       {(!collapsible || isOpen) && <div className="space-y-1.5">{children}</div>}
+    </div>
+  );
+}
+
+function AnnotationBadges({ annotations }: { annotations: AnnotationInfo[] }) {
+  return (
+    <div className="flex flex-wrap gap-1 mb-0.5">
+      {annotations.map((ann) => (
+        <span
+          key={ann.name}
+          className="text-xs text-amber-300 bg-amber-900/40 px-1.5 py-0.5 rounded"
+        >
+          @{ann.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function MethodSignature({
+  method,
+  renderTypeLink,
+}: {
+  method: MethodInfo;
+  renderTypeLink: (typeName: string, className?: string) => React.ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline gap-1.5 flex-wrap">
+      <span className="text-gray-500 text-xs">
+        {renderTypeLink(method.returnType || "void", "text-gray-500")}
+      </span>
+      <span className="text-gray-100 font-medium">{method.name}</span>
+      <span className="text-gray-500">(</span>
+      {method.parameters.map((param, i) => (
+        <span key={param.name} className="text-xs">
+          {renderTypeLink(param.type || "?", "text-gray-500")}
+          <span className="text-gray-400 ml-0.5">{param.name}</span>
+          {i < method.parameters.length - 1 && <span className="text-gray-500">, </span>}
+        </span>
+      ))}
+      <span className="text-gray-500">)</span>
     </div>
   );
 }
