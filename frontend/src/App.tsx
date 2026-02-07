@@ -17,7 +17,9 @@ import {
   MIN_DETAILS_PANEL_WIDTH,
   MAX_SIDEBAR_WIDTH,
   MAX_DETAILS_PANEL_WIDTH,
+  MAX_RECENT_PROJECTS,
 } from "./types/settings";
+import type { RecentProject } from "./types/settings";
 import { createLogger } from "./utils/logger";
 import { markStart, markEnd, clearMetrics } from "./utils/perf";
 
@@ -95,15 +97,23 @@ export function App() {
       setStatusMessage(`Loaded ${result.stats.classesFound} classes, ${result.stats.endpointsFound} endpoints`);
       markEnd("app:projectLoad");
 
-      // Save to lastProjectPath in settings
-      updateCategory("general", { lastProjectPath: path });
+      // Save to lastProjectPath and update recent projects
+      const projectName = path.split(/[/\\]/).filter(Boolean).pop() || path;
+      const newRecent: RecentProject = {
+        path,
+        name: projectName,
+        lastOpened: new Date().toISOString(),
+      };
+      const existing = settings.general.recentProjects.filter((p) => p.path !== path);
+      const recentProjects = [newRecent, ...existing].slice(0, MAX_RECENT_PROJECTS);
+      updateCategory("general", { lastProjectPath: path, recentProjects });
     } catch (err) {
       logger.error("Exception loading project:", err);
       setStatus("error");
       setStatusMessage(err instanceof Error ? err.message : "Unknown error");
       markEnd("app:projectLoad");
     }
-  }, [parseOnly, updateCategory, clearCaches]);
+  }, [parseOnly, updateCategory, clearCaches, settings.general.recentProjects]);
 
   const handleBrowseFolder = useCallback(async () => {
     setShowOpenMenu(false);
@@ -473,43 +483,118 @@ export function App() {
       />
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Resizable Sidebar */}
-        <ResizablePanel
-          width={settings.layout.sidebarWidth}
-          minWidth={MIN_SIDEBAR_WIDTH}
-          maxWidth={MAX_SIDEBAR_WIDTH}
-          onWidthChange={handleSidebarWidthChange}
-          side="left"
-        >
-          <Sidebar
-            ref={sidebarRef}
-            nodes={graph.nodes}
-            onNodeSelect={handleNodeSelect}
-            onFilterChange={setFilters}
-            selectedNodeId={selectedNodeId}
-          />
-        </ResizablePanel>
+      {status === "idle" || status === "error" ? (
+        /* Landing screen */
+        <div className="flex-1 flex items-center justify-center overflow-hidden">
+          <div className="text-center max-w-md">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <h2 className="text-xl font-semibold text-gray-300 mb-2">Open a project to get started</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Browse for a folder or drag and drop one here
+            </p>
+            <button
+              onClick={handleBrowseFolder}
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-sm inline-flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              Open Project
+            </button>
 
-        {/* Graph view */}
-        <GraphView
-          ref={graphRef}
-          graph={graph}
-          filters={filters}
-          selectedNodeId={selectedNodeId}
-          onNodeSelect={handleNodeSelect}
-          onNodeDoubleClick={handleNodeDoubleClick}
-        />
+            {status === "error" && statusMessage && (
+              <div className="mt-4 p-3 bg-red-900/30 border border-red-800 rounded text-sm text-red-300">
+                {statusMessage}
+              </div>
+            )}
 
-        {/* Resizable Details panel */}
-        {!detailsPanelCollapsed ? (
+            {/* Recent projects */}
+            {settings.general.recentProjects.length > 0 && (
+              <div className="mt-8 text-left">
+                <h3 className="text-sm font-medium text-gray-400 mb-3">Recent Projects</h3>
+                <div className="space-y-1">
+                  {settings.general.recentProjects.map((project) => (
+                    <button
+                      key={project.path}
+                      onClick={() => handleLoadProject(project.path)}
+                      className="w-full text-left px-3 py-2 rounded hover:bg-gray-800 group transition-colors"
+                    >
+                      <div className="text-sm text-gray-300 group-hover:text-gray-100 truncate">
+                        {project.name}
+                      </div>
+                      <div className="text-xs text-gray-600 truncate">
+                        {project.path}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : status === "scanning" || status === "parsing" ? (
+        /* Loading state */
+        <div className="flex-1 flex items-center justify-center overflow-hidden">
+          <div className="text-center">
+            <svg className="w-8 h-8 mx-auto mb-3 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <p className="text-sm text-gray-400">{statusMessage}</p>
+          </div>
+        </div>
+      ) : (
+        /* Graph workspace */
+        <div className="flex-1 flex overflow-hidden">
+          {/* Resizable Sidebar */}
           <ResizablePanel
-            width={settings.layout.detailsPanelWidth}
-            minWidth={MIN_DETAILS_PANEL_WIDTH}
-            maxWidth={MAX_DETAILS_PANEL_WIDTH}
-            onWidthChange={handleDetailsPanelWidthChange}
-            side="right"
+            width={settings.layout.sidebarWidth}
+            minWidth={MIN_SIDEBAR_WIDTH}
+            maxWidth={MAX_SIDEBAR_WIDTH}
+            onWidthChange={handleSidebarWidthChange}
+            side="left"
           >
+            <Sidebar
+              ref={sidebarRef}
+              nodes={graph.nodes}
+              onNodeSelect={handleNodeSelect}
+              onFilterChange={setFilters}
+              selectedNodeId={selectedNodeId}
+            />
+          </ResizablePanel>
+
+          {/* Graph view */}
+          <GraphView
+            ref={graphRef}
+            graph={graph}
+            filters={filters}
+            selectedNodeId={selectedNodeId}
+            onNodeSelect={handleNodeSelect}
+            onNodeDoubleClick={handleNodeDoubleClick}
+          />
+
+          {/* Resizable Details panel */}
+          {!detailsPanelCollapsed ? (
+            <ResizablePanel
+              width={settings.layout.detailsPanelWidth}
+              minWidth={MIN_DETAILS_PANEL_WIDTH}
+              maxWidth={MAX_DETAILS_PANEL_WIDTH}
+              onWidthChange={handleDetailsPanelWidthChange}
+              side="right"
+            >
+              <NodeDetails
+                node={detailsNode}
+                isCollapsed={detailsPanelCollapsed}
+                onToggleCollapse={handleToggleDetailsPanel}
+                onClose={handleCloseDetails}
+                onOpenFile={handleOpenFile}
+                onNavigateToNode={handleNavigateToNode}
+                allNodes={graph.nodes}
+              />
+            </ResizablePanel>
+          ) : (
             <NodeDetails
               node={detailsNode}
               isCollapsed={detailsPanelCollapsed}
@@ -519,19 +604,9 @@ export function App() {
               onNavigateToNode={handleNavigateToNode}
               allNodes={graph.nodes}
             />
-          </ResizablePanel>
-        ) : (
-          <NodeDetails
-            node={detailsNode}
-            isCollapsed={detailsPanelCollapsed}
-            onToggleCollapse={handleToggleDetailsPanel}
-            onClose={handleCloseDetails}
-            onOpenFile={handleOpenFile}
-            onNavigateToNode={handleNavigateToNode}
-            allNodes={graph.nodes}
-          />
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Status bar */}
       <StatusBar
