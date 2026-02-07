@@ -88,12 +88,19 @@ export interface ProjectInfo {
   };
 }
 
+export interface AnnotationInfo {
+  name: string;
+  arguments: Record<string, string>;
+}
+
 export interface MethodInfo {
   name: string;
   returnType: string | null;
   parameters: { name: string; type: string | null }[];
   modifiers: string[];
   line: number;
+  docstring?: string | null;
+  annotations?: AnnotationInfo[];
 }
 
 export interface FieldInfo {
@@ -101,6 +108,7 @@ export interface FieldInfo {
   type: string | null;
   modifiers: string[];
   line: number;
+  annotations?: AnnotationInfo[];
 }
 
 export interface ClassDetails {

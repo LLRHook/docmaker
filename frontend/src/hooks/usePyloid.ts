@@ -160,6 +160,15 @@ export function usePyloid() {
 
   const openFile = useCallback(async (path: string, line: number = 0): Promise<{ success: boolean; error?: string }> => {
     logger.debug("openFile called:", path, line);
+
+    // In dev mode (Pyloid not available), fall back to vscode:// URI scheme
+    if (!pyloidReadyManager.isReady()) {
+      logger.info("Pyloid not ready, falling back to vscode:// URI");
+      const uri = line > 0 ? `vscode://file/${path}:${line}` : `vscode://file/${path}`;
+      window.open(uri);
+      return { success: true };
+    }
+
     try {
       const result = await ipc.DocmakerAPI.open_file(path, line);
       const parsed = JSON.parse(result);

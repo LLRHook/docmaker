@@ -452,6 +452,11 @@ class DocmakerAPI(PyloidIPC):
                             "parameters": [{"name": p.name, "type": p.type} for p in m.parameters],
                             "modifiers": m.modifiers,
                             "line": m.line_number,
+                            "docstring": m.docstring,
+                            "annotations": [
+                                {"name": a.name, "arguments": a.arguments}
+                                for a in m.annotations
+                            ],
                         }
                         for m in cls.methods
                     ],
@@ -461,6 +466,10 @@ class DocmakerAPI(PyloidIPC):
                             "type": f.type,
                             "modifiers": f.modifiers,
                             "line": f.line_number,
+                            "annotations": [
+                                {"name": a.name, "arguments": a.arguments}
+                                for a in f.annotations
+                            ],
                         }
                         for f in cls.fields
                     ],

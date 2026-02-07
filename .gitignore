@@ -64,6 +64,7 @@ CLAUDE.md
 packaging/icons/*.ico
 packaging/icons/*.icns
 packaging/icons/*.png
+!packaging/icons/docmaker.png
 
 # Test artifacts
 frontend/test-results/
