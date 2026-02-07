@@ -67,6 +67,7 @@ class JavaParser(BaseParser):
         symbols.imports = self._extract_imports(tree.root_node, content)
         symbols.classes = self._extract_classes(tree.root_node, content, file.path)
         symbols.endpoints = self._extract_endpoints_from_classes(symbols.classes, symbols.package)
+        self._resolve_calls(symbols)
 
         return symbols
 
@@ -275,6 +276,7 @@ class JavaParser(BaseParser):
         return_type = None
         parameters = []
         docstring = None
+        body_node = None
 
         annotations = self._extract_annotations(node, content)
         modifiers = self._extract_modifiers(node, content)
@@ -287,6 +289,8 @@ class JavaParser(BaseParser):
                     return_type = self._get_node_text(child, content)
             elif child.type == "formal_parameters":
                 parameters = self._parse_parameters(child, content)
+            elif child.type == "block":
+                body_node = child
 
         prev_sibling = node.prev_sibling
         if prev_sibling and prev_sibling.type in ("block_comment", "line_comment"):
@@ -294,6 +298,8 @@ class JavaParser(BaseParser):
 
         if not name:
             return None
+
+        calls = self._extract_calls_from_body(body_node, content) if body_node else []
 
         return FunctionDef(
             name=name,
@@ -306,6 +312,7 @@ class JavaParser(BaseParser):
             annotations=annotations,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
 
     def _parse_constructor(self, node: Node, content: str, file_path: Path) -> FunctionDef | None:
@@ -313,6 +320,7 @@ class JavaParser(BaseParser):
         name = None
         parameters = []
         docstring = None
+        body_node = None
 
         annotations = self._extract_annotations(node, content)
         modifiers = self._extract_modifiers(node, content)
@@ -322,6 +330,8 @@ class JavaParser(BaseParser):
                 name = self._get_node_text(child, content)
             elif child.type == "formal_parameters":
                 parameters = self._parse_parameters(child, content)
+            elif child.type in ("block", "constructor_body"):
+                body_node = child
 
         prev_sibling = node.prev_sibling
         if prev_sibling and prev_sibling.type in ("block_comment", "line_comment"):
@@ -329,6 +339,8 @@ class JavaParser(BaseParser):
 
         if not name:
             return None
+
+        calls = self._extract_calls_from_body(body_node, content) if body_node else []
 
         return FunctionDef(
             name=name,
@@ -341,6 +353,7 @@ class JavaParser(BaseParser):
             annotations=annotations,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
 
     def _parse_parameters(self, node: Node, content: str) -> list[Parameter]:
@@ -440,6 +453,71 @@ class JavaParser(BaseParser):
             if line:
                 cleaned.append(line)
         return "\n".join(cleaned)
+
+    def _extract_calls_from_body(self, body_node: Node, content: str) -> list[str]:
+        """Extract call targets from a method/constructor body node."""
+        calls: list[str] = []
+        self._collect_calls(body_node, content, calls)
+        return sorted(set(calls))
+
+    def _collect_calls(self, node: Node, content: str, calls: list[str]) -> None:
+        """Recursively collect method invocation targets."""
+        if node.type == "method_invocation":
+            target = self._get_call_target(node, content)
+            if target:
+                calls.append(target)
+        for child in node.children:
+            self._collect_calls(child, content, calls)
+
+    def _get_call_target(self, call_node: Node, content: str) -> str | None:
+        """Extract the callee name from a method_invocation node."""
+        name_node = call_node.child_by_field_name("name")
+        object_node = call_node.child_by_field_name("object")
+
+        if name_node:
+            method_name = self._get_node_text(name_node, content)
+            if object_node:
+                object_text = self._get_node_text(object_node, content)
+                return f"{object_text}.{method_name}"
+            return method_name
+        return None
+
+    def _resolve_calls(self, symbols: FileSymbols) -> None:
+        """Resolve call targets against imports."""
+        import_map = self._build_import_map(symbols.imports)
+
+        for cls in symbols.classes:
+            for method in cls.methods:
+                method.calls = self._resolve_call_list(method.calls, import_map)
+
+    def _build_import_map(self, imports: list[ImportDef]) -> dict[str, str]:
+        """Build a map from local names to import FQNs."""
+        import_map: dict[str, str] = {}
+        for imp in imports:
+            if imp.is_wildcard:
+                continue
+            parts = imp.module.split(".")
+            local_name = parts[-1]
+            import_map[local_name] = imp.module
+        return import_map
+
+    def _resolve_call_list(
+        self, calls: list[str], import_map: dict[str, str]
+    ) -> list[str]:
+        """Resolve a list of call targets using the import map."""
+        resolved = []
+        for call in calls:
+            parts = call.split(".")
+            root = parts[0]
+            if root in import_map:
+                resolved_root = import_map[root]
+                if len(parts) > 1:
+                    resolved.append(f"{resolved_root}.{'.'.join(parts[1:])}")
+                else:
+                    resolved.append(resolved_root)
+            else:
+                resolved.append(call)
+        return resolved
 
     def _extract_endpoints_from_classes(
         self, classes: list[ClassDef], package: str | None

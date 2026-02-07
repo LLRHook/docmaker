@@ -402,3 +402,78 @@ def test_parser_extracts_class_fields(python_parser, sample_python_class):
     user_service = next(c for c in symbols.classes if c.name == "UserService")
     field_names = [f.name for f in user_service.fields]
     assert "default_limit" in field_names
+
+
+def test_parser_extracts_method_calls(python_parser, sample_python_class):
+    """Test that the parser extracts method call targets."""
+    source_file = SourceFile(
+        path=sample_python_class,
+        relative_path=Path("user_service.py"),
+        language=Language.PYTHON,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = python_parser.parse(source_file)
+
+    user_service = next(c for c in symbols.classes if c.name == "UserService")
+
+    get_user = next(m for m in user_service.methods if m.name == "get_user")
+    assert "self.repository.find_by_id" in get_user.calls
+
+    create_user = next(m for m in user_service.methods if m.name == "create_user")
+    assert "app.models.User" in create_user.calls
+    assert "self.repository.save" in create_user.calls
+
+
+def test_parser_extracts_calls_with_import_resolution(python_parser):
+    """Test that call targets are resolved against imports."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write('''from utils.helpers import format_name
+from models import User as UserModel
+
+def process():
+    name = format_name("a", "b")
+    user = UserModel(name=name)
+    print(user)
+''')
+        f.flush()
+        path = Path(f.name)
+
+    source_file = SourceFile(
+        path=path,
+        relative_path=Path("process.py"),
+        language=Language.PYTHON,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = python_parser.parse(source_file)
+
+    process_fn = next(f for f in symbols.functions if f.name == "process")
+    assert "utils.helpers.format_name" in process_fn.calls
+    assert "models.User" in process_fn.calls
+    assert "print" in process_fn.calls
+
+
+def test_parser_extracts_no_calls_from_empty_body(python_parser):
+    """Test that functions with no calls have empty calls list."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write('''def noop():
+    pass
+
+def returns_literal():
+    return 42
+''')
+        f.flush()
+        path = Path(f.name)
+
+    source_file = SourceFile(
+        path=path,
+        relative_path=Path("empty.py"),
+        language=Language.PYTHON,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = python_parser.parse(source_file)
+
+    for func in symbols.functions:
+        assert func.calls == []

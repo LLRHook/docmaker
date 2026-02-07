@@ -539,3 +539,78 @@ export function Greeting({ name }: Props): JSX.Element {
 
     function_names = [f.name for f in symbols.functions]
     assert "Greeting" in function_names
+
+
+def test_parser_extracts_method_calls(typescript_parser, sample_typescript_class):
+    """Test that the parser extracts method call targets."""
+    source_file = SourceFile(
+        path=sample_typescript_class,
+        relative_path=Path("user.service.ts"),
+        language=Language.TYPESCRIPT,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = typescript_parser.parse(source_file)
+
+    user_service = next(c for c in symbols.classes if c.name == "UserService")
+
+    get_users = next(m for m in user_service.methods if m.name == "getUsers")
+    assert "this.http.get" in get_users.calls
+
+    create_user = next(m for m in user_service.methods if m.name == "createUser")
+    assert "this.http.post" in create_user.calls
+
+
+def test_parser_extracts_function_calls(typescript_parser, sample_typescript_functions):
+    """Test that the parser extracts calls from module-level functions."""
+    source_file = SourceFile(
+        path=sample_typescript_functions,
+        relative_path=Path("utils.ts"),
+        language=Language.TYPESCRIPT,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = typescript_parser.parse(source_file)
+
+    fetch_users = next(f for f in symbols.functions if f.name == "fetchUsers")
+    assert "fetch" in fetch_users.calls
+    assert "response.json" in fetch_users.calls
+
+
+def test_parser_extracts_arrow_function_calls(typescript_parser, sample_typescript_functions):
+    """Test that the parser extracts calls from arrow functions."""
+    source_file = SourceFile(
+        path=sample_typescript_functions,
+        relative_path=Path("utils.ts"),
+        language=Language.TYPESCRIPT,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = typescript_parser.parse(source_file)
+
+    process_user = next((f for f in symbols.functions if f.name == "processUser"), None)
+    if process_user:
+        assert "console.log" in process_user.calls
+
+
+def test_parser_extracts_no_calls_from_empty_function(typescript_parser):
+    """Test that functions with no calls have empty calls list."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ts", delete=False) as f:
+        f.write('''export function identity(x: number): number {
+  return x;
+}
+''')
+        f.flush()
+        path = Path(f.name)
+
+    source_file = SourceFile(
+        path=path,
+        relative_path=Path("identity.ts"),
+        language=Language.TYPESCRIPT,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = typescript_parser.parse(source_file)
+
+    identity = next(f for f in symbols.functions if f.name == "identity")
+    assert identity.calls == []

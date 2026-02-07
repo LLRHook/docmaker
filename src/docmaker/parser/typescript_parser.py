@@ -58,6 +58,7 @@ class TypeScriptParser(BaseParser):
 
         interfaces = self._extract_interfaces(tree.root_node, content, file.path)
         symbols.classes.extend(interfaces)
+        self._resolve_calls(symbols)
 
         return symbols
 
@@ -364,6 +365,7 @@ class TypeScriptParser(BaseParser):
         return_type = None
         docstring = None
         modifiers = []
+        body_node = None
 
         for child in node.children:
             if child.type == "property_identifier":
@@ -378,11 +380,15 @@ class TypeScriptParser(BaseParser):
                 modifiers.append(child.type)
             elif child.type == "accessibility_modifier":
                 modifiers.append(self._get_node_text(child, content))
+            elif child.type == "statement_block":
+                body_node = child
 
         docstring = self._extract_jsdoc(node, content)
 
         if not name:
             return None
+
+        calls = self._extract_calls_from_body(body_node, content) if body_node else []
 
         return FunctionDef(
             name=name,
@@ -395,6 +401,7 @@ class TypeScriptParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
 
     def _extract_module_functions(
@@ -443,6 +450,7 @@ class TypeScriptParser(BaseParser):
         return_type = None
         docstring = None
         modifiers = []
+        body_node = None
 
         for child in node.children:
             if child.type == "identifier":
@@ -455,11 +463,15 @@ class TypeScriptParser(BaseParser):
                         return_type = self._get_node_text(subchild, content)
             elif child.type == "async":
                 modifiers.append("async")
+            elif child.type == "statement_block":
+                body_node = child
 
         docstring = self._extract_jsdoc(node, content)
 
         if not name:
             return None
+
+        calls = self._extract_calls_from_body(body_node, content) if body_node else []
 
         return FunctionDef(
             name=name,
@@ -472,6 +484,7 @@ class TypeScriptParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
 
     def _extract_arrow_functions(
@@ -511,6 +524,7 @@ class TypeScriptParser(BaseParser):
         parameters = []
         return_type = None
         modifiers = []
+        body_node = None
 
         for child in node.children:
             if child.type == "formal_parameters":
@@ -523,6 +537,10 @@ class TypeScriptParser(BaseParser):
                         return_type = self._get_node_text(subchild, content)
             elif child.type == "async":
                 modifiers.append("async")
+            elif child.type == "statement_block":
+                body_node = child
+
+        calls = self._extract_calls_from_body(body_node, content) if body_node else []
 
         return FunctionDef(
             name=name,
@@ -534,7 +552,74 @@ class TypeScriptParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
+
+    def _extract_calls_from_body(self, body_node: Node, content: str) -> list[str]:
+        """Extract call targets from a function body node."""
+        calls: list[str] = []
+        self._collect_calls(body_node, content, calls)
+        return sorted(set(calls))
+
+    def _collect_calls(self, node: Node, content: str, calls: list[str]) -> None:
+        """Recursively collect call expression targets."""
+        if node.type == "call_expression":
+            target = self._get_call_target(node, content)
+            if target:
+                calls.append(target)
+        for child in node.children:
+            self._collect_calls(child, content, calls)
+
+    def _get_call_target(self, call_node: Node, content: str) -> str | None:
+        """Extract the callee name from a call_expression node."""
+        for child in call_node.children:
+            if child.type == "identifier":
+                return self._get_node_text(child, content)
+            elif child.type == "member_expression":
+                return self._get_node_text(child, content)
+        return None
+
+    def _resolve_calls(self, symbols: FileSymbols) -> None:
+        """Resolve call targets against imports."""
+        import_map = self._build_import_map(symbols.imports)
+
+        for cls in symbols.classes:
+            for method in cls.methods:
+                method.calls = self._resolve_call_list(method.calls, import_map)
+        for func in symbols.functions:
+            func.calls = self._resolve_call_list(func.calls, import_map)
+
+    def _build_import_map(self, imports: list[ImportDef]) -> dict[str, str]:
+        """Build a map from local names to import FQNs."""
+        import_map: dict[str, str] = {}
+        for imp in imports:
+            if imp.is_wildcard:
+                continue
+            if imp.alias:
+                import_map[imp.alias] = imp.module
+            else:
+                parts = imp.module.split(".")
+                local_name = parts[-1]
+                import_map[local_name] = imp.module
+        return import_map
+
+    def _resolve_call_list(
+        self, calls: list[str], import_map: dict[str, str]
+    ) -> list[str]:
+        """Resolve a list of call targets using the import map."""
+        resolved = []
+        for call in calls:
+            parts = call.split(".")
+            root = parts[0]
+            if root in import_map:
+                resolved_root = import_map[root]
+                if len(parts) > 1:
+                    resolved.append(f"{resolved_root}.{'.'.join(parts[1:])}")
+                else:
+                    resolved.append(resolved_root)
+            else:
+                resolved.append(call)
+        return resolved
 
     def _parse_parameters(self, node: Node, content: str) -> list[Parameter]:
         """Parse function parameters."""

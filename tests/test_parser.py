@@ -175,3 +175,89 @@ def test_parser_extracts_endpoint_paths(java_parser, sample_controller):
     paths = {ep.path for ep in symbols.endpoints}
     assert "/api/users/{id}" in paths
     assert "/api/users" in paths
+
+
+def test_parser_extracts_method_calls(java_parser, sample_controller):
+    """Test that the parser extracts method call targets."""
+    source_file = SourceFile(
+        path=sample_controller,
+        relative_path=Path("UserController.java"),
+        language=Language.JAVA,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = java_parser.parse(source_file)
+
+    cls = symbols.classes[0]
+
+    get_user = next(m for m in cls.methods if m.name == "getUser")
+    assert "userService.findById" in get_user.calls
+
+    create_user = next(m for m in cls.methods if m.name == "createUser")
+    assert "userService.save" in create_user.calls
+
+    delete_user = next(m for m in cls.methods if m.name == "deleteUser")
+    assert "userService.delete" in delete_user.calls
+
+
+def test_parser_extracts_simple_calls(java_parser):
+    """Test that the parser extracts simple (unqualified) method calls."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".java", delete=False) as f:
+        f.write("""
+package com.example;
+
+public class Service {
+    public void process() {
+        validate();
+        transform();
+    }
+
+    private void validate() {}
+    private void transform() {}
+}
+""")
+        f.flush()
+        path = Path(f.name)
+
+    source_file = SourceFile(
+        path=path,
+        relative_path=Path("Service.java"),
+        language=Language.JAVA,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = java_parser.parse(source_file)
+
+    cls = symbols.classes[0]
+    process = next(m for m in cls.methods if m.name == "process")
+    assert "validate" in process.calls
+    assert "transform" in process.calls
+
+
+def test_parser_extracts_no_calls_from_empty_method(java_parser):
+    """Test that methods with no calls have empty calls list."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".java", delete=False) as f:
+        f.write("""
+package com.example;
+
+public class Simple {
+    public int getValue() {
+        return 42;
+    }
+}
+""")
+        f.flush()
+        path = Path(f.name)
+
+    source_file = SourceFile(
+        path=path,
+        relative_path=Path("Simple.java"),
+        language=Language.JAVA,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = java_parser.parse(source_file)
+
+    cls = symbols.classes[0]
+    get_value = next(m for m in cls.methods if m.name == "getValue")
+    assert get_value.calls == []
