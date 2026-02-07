@@ -15,7 +15,6 @@ export interface FilterState {
   categories: Set<string>;
   edgeTypes: Set<string>;
   searchQuery: string;
-  edgeTypes: Set<string>;
 }
 
 const NODE_TYPES = [
@@ -32,6 +31,14 @@ const CATEGORIES = [
   { id: "config", label: "Config", color: "bg-amber-500" },
   { id: "test", label: "Test", color: "bg-gray-500" },
   { id: "unknown", label: "Unknown", color: "bg-c-hover" },
+];
+
+const EDGE_TYPES = [
+  { id: "extends", label: "Extends", color: "bg-blue-500" },
+  { id: "implements", label: "Implements", color: "bg-purple-500" },
+  { id: "imports", label: "Imports", color: "bg-gray-500" },
+  { id: "calls", label: "Calls", color: "bg-gray-400" },
+  { id: "contains", label: "Contains", color: "bg-gray-600" },
 ];
 
 export interface SidebarHandle {
@@ -51,6 +58,9 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
   );
   const [activeCategories, setActiveCategories] = useState<Set<string>>(
     new Set(CATEGORIES.map((c) => c.id))
+  );
+  const [activeEdgeTypes, setActiveEdgeTypes] = useState<Set<string>>(
+    new Set(EDGE_TYPES.map((e) => e.id))
   );
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     try {
@@ -90,12 +100,11 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
       onFilterChange({
         nodeTypes: activeNodeTypes,
         categories: activeCategories,
-        edgeTypes,
+        edgeTypes: activeEdgeTypes,
         searchQuery: "",
-        edgeTypes,
       });
     },
-  }), [nodes, activeNodeTypes, activeCategories, edgeTypes, searchQuery, onFilterChange]);
+  }), [nodes, activeNodeTypes, activeCategories, activeEdgeTypes, searchQuery, onFilterChange]);
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -119,12 +128,11 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
       onFilterChange({
         nodeTypes: activeNodeTypes,
         categories: activeCategories,
-        edgeTypes,
+        edgeTypes: activeEdgeTypes,
         searchQuery: query,
-        edgeTypes,
       });
     }, 200);
-  }, [activeNodeTypes, activeCategories, edgeTypes, onFilterChange]);
+  }, [activeNodeTypes, activeCategories, activeEdgeTypes, onFilterChange]);
 
   const toggleNodeType = (typeId: string) => {
     const newTypes = new Set(activeNodeTypes);
@@ -137,9 +145,8 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
     onFilterChange({
       nodeTypes: newTypes,
       categories: activeCategories,
-      edgeTypes,
+      edgeTypes: activeEdgeTypes,
       searchQuery,
-      edgeTypes,
     });
   };
 
@@ -154,9 +161,24 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
     onFilterChange({
       nodeTypes: activeNodeTypes,
       categories: newCategories,
-      edgeTypes,
+      edgeTypes: activeEdgeTypes,
       searchQuery,
-      edgeTypes,
+    });
+  };
+
+  const toggleEdgeType = (typeId: string) => {
+    const newTypes = new Set(activeEdgeTypes);
+    if (newTypes.has(typeId)) {
+      newTypes.delete(typeId);
+    } else {
+      newTypes.add(typeId);
+    }
+    setActiveEdgeTypes(newTypes);
+    onFilterChange({
+      nodeTypes: activeNodeTypes,
+      categories: activeCategories,
+      edgeTypes: newTypes,
+      searchQuery,
     });
   };
 
@@ -239,6 +261,26 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
             >
               <span className={`w-2 h-2 rounded-full ${cat.color}`} />
               {cat.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-3 border-b border-gray-700">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">Edge Types</h3>
+        <div className="flex flex-wrap gap-1">
+          {EDGE_TYPES.map((type) => (
+            <button
+              key={type.id}
+              onClick={() => toggleEdgeType(type.id)}
+              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                activeEdgeTypes.has(type.id)
+                  ? "bg-gray-600 text-gray-100"
+                  : "bg-gray-700 text-gray-500"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${type.color}`} />
+              {type.label}
             </button>
           ))}
         </div>
