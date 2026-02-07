@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docmaker"
-version = "0.4.1"
+version = "1.0.0"
 description = "Code-to-Knowledge Pipeline: Crawl codebases and generate interlinked Obsidian documentation"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,7 +24,9 @@ classifiers = [
 ]
 dependencies = [
     "tree-sitter>=0.21.0",
+    "tree-sitter-go>=0.21.0",
     "tree-sitter-java>=0.21.0",
+    "tree-sitter-javascript>=0.21.0",
     "tree-sitter-kotlin>=0.21.0",
     "tree-sitter-python>=0.21.0",
     "tree-sitter-typescript>=0.21.0",
