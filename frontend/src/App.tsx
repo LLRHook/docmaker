@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { GraphView, type GraphViewHandle } from "./components/GraphView";
+import { RecentProjects } from "./components/RecentProjects";
 import { Sidebar, type FilterState, type SidebarHandle } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { NodeDetails } from "./components/NodeDetails";
@@ -12,6 +13,7 @@ import { useSettings } from "./contexts/SettingsContext";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
 import { useKeyboardNavigation, type KeyboardNavigationCallbacks } from "./hooks/useKeyboardNavigation";
 import type { CodeGraph, GraphNode } from "./types/graph";
+import type { RecentProject } from "./types/settings";
 import {
   MIN_SIDEBAR_WIDTH,
   MIN_DETAILS_PANEL_WIDTH,
@@ -95,15 +97,25 @@ export function App() {
       setStatusMessage(`Loaded ${result.stats.classesFound} classes, ${result.stats.endpointsFound} endpoints`);
       markEnd("app:projectLoad");
 
-      // Save to lastProjectPath in settings
-      updateCategory("general", { lastProjectPath: path });
+      // Save to lastProjectPath and update recent projects
+      const projectName = path.split(/[/\\]/).filter(Boolean).pop() || path;
+      const newRecent: RecentProject = {
+        path,
+        name: projectName,
+        lastOpened: new Date().toISOString(),
+      };
+      const existing = settings.general.recentProjects.filter(
+        (p) => p.path !== path
+      );
+      const recentProjects = [newRecent, ...existing].slice(0, 10);
+      updateCategory("general", { lastProjectPath: path, recentProjects });
     } catch (err) {
       logger.error("Exception loading project:", err);
       setStatus("error");
       setStatusMessage(err instanceof Error ? err.message : "Unknown error");
       markEnd("app:projectLoad");
     }
-  }, [parseOnly, updateCategory, clearCaches]);
+  }, [parseOnly, updateCategory, clearCaches, settings.general.recentProjects]);
 
   const handleBrowseFolder = useCallback(async () => {
     setShowOpenMenu(false);
@@ -144,6 +156,13 @@ export function App() {
       setShowPathInput(false);
     }
   }, [handlePathInputSubmit]);
+
+  const handleRemoveRecentProject = useCallback((path: string) => {
+    const recentProjects = settings.general.recentProjects.filter(
+      (p) => p.path !== path
+    );
+    updateCategory("general", { recentProjects });
+  }, [settings.general.recentProjects, updateCategory]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -468,61 +487,72 @@ export function App() {
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Resizable Sidebar */}
-        <ResizablePanel
-          width={settings.layout.sidebarWidth}
-          minWidth={MIN_SIDEBAR_WIDTH}
-          maxWidth={MAX_SIDEBAR_WIDTH}
-          onWidthChange={handleSidebarWidthChange}
-          side="left"
-        >
-          <Sidebar
-            ref={sidebarRef}
-            nodes={graph.nodes}
-            onNodeSelect={handleNodeSelect}
-            onFilterChange={setFilters}
-            selectedNodeId={selectedNodeId}
-          />
-        </ResizablePanel>
+        {projectPath ? (
+          <>
+            {/* Resizable Sidebar */}
+            <ResizablePanel
+              width={settings.layout.sidebarWidth}
+              minWidth={MIN_SIDEBAR_WIDTH}
+              maxWidth={MAX_SIDEBAR_WIDTH}
+              onWidthChange={handleSidebarWidthChange}
+              side="left"
+            >
+              <Sidebar
+                ref={sidebarRef}
+                nodes={graph.nodes}
+                onNodeSelect={handleNodeSelect}
+                onFilterChange={setFilters}
+                selectedNodeId={selectedNodeId}
+              />
+            </ResizablePanel>
 
-        {/* Graph view */}
-        <GraphView
-          ref={graphRef}
-          graph={graph}
-          filters={filters}
-          selectedNodeId={selectedNodeId}
-          onNodeSelect={handleNodeSelect}
-          onNodeDoubleClick={handleNodeDoubleClick}
-        />
-
-        {/* Resizable Details panel */}
-        {!detailsPanelCollapsed ? (
-          <ResizablePanel
-            width={settings.layout.detailsPanelWidth}
-            minWidth={MIN_DETAILS_PANEL_WIDTH}
-            maxWidth={MAX_DETAILS_PANEL_WIDTH}
-            onWidthChange={handleDetailsPanelWidthChange}
-            side="right"
-          >
-            <NodeDetails
-              node={detailsNode}
-              isCollapsed={detailsPanelCollapsed}
-              onToggleCollapse={handleToggleDetailsPanel}
-              onClose={handleCloseDetails}
-              onOpenFile={handleOpenFile}
-              onNavigateToNode={handleNavigateToNode}
-              allNodes={graph.nodes}
+            {/* Graph view */}
+            <GraphView
+              ref={graphRef}
+              graph={graph}
+              filters={filters}
+              selectedNodeId={selectedNodeId}
+              onNodeSelect={handleNodeSelect}
+              onNodeDoubleClick={handleNodeDoubleClick}
             />
-          </ResizablePanel>
+
+            {/* Resizable Details panel */}
+            {!detailsPanelCollapsed ? (
+              <ResizablePanel
+                width={settings.layout.detailsPanelWidth}
+                minWidth={MIN_DETAILS_PANEL_WIDTH}
+                maxWidth={MAX_DETAILS_PANEL_WIDTH}
+                onWidthChange={handleDetailsPanelWidthChange}
+                side="right"
+              >
+                <NodeDetails
+                  node={detailsNode}
+                  isCollapsed={detailsPanelCollapsed}
+                  onToggleCollapse={handleToggleDetailsPanel}
+                  onClose={handleCloseDetails}
+                  onOpenFile={handleOpenFile}
+                  onNavigateToNode={handleNavigateToNode}
+                  allNodes={graph.nodes}
+                />
+              </ResizablePanel>
+            ) : (
+              <NodeDetails
+                node={detailsNode}
+                isCollapsed={detailsPanelCollapsed}
+                onToggleCollapse={handleToggleDetailsPanel}
+                onClose={handleCloseDetails}
+                onOpenFile={handleOpenFile}
+                onNavigateToNode={handleNavigateToNode}
+                allNodes={graph.nodes}
+              />
+            )}
+          </>
         ) : (
-          <NodeDetails
-            node={detailsNode}
-            isCollapsed={detailsPanelCollapsed}
-            onToggleCollapse={handleToggleDetailsPanel}
-            onClose={handleCloseDetails}
-            onOpenFile={handleOpenFile}
-            onNavigateToNode={handleNavigateToNode}
-            allNodes={graph.nodes}
+          <RecentProjects
+            recentProjects={settings.general.recentProjects}
+            onOpenProject={handleLoadProject}
+            onRemoveProject={handleRemoveRecentProject}
+            onBrowse={handleBrowseFolder}
           />
         )}
       </div>

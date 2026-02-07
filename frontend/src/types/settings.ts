@@ -20,9 +20,16 @@ export interface EditorSettings {
   alwaysAsk: boolean;
 }
 
+export interface RecentProject {
+  path: string;
+  name: string;
+  lastOpened: string; // ISO 8601 timestamp
+}
+
 export interface GeneralSettings {
   openLastProjectOnStartup: boolean;
   lastProjectPath: string | null;
+  recentProjects: RecentProject[];
 }
 
 export interface LayoutSettings {
@@ -63,6 +70,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   general: {
     openLastProjectOnStartup: false,
     lastProjectPath: null,
+    recentProjects: [],
   },
   layout: {
     windowWidth: 1280,

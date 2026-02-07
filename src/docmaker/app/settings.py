@@ -32,6 +32,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "general": {
         "openLastProjectOnStartup": False,
         "lastProjectPath": None,
+        "recentProjects": [],
     },
     "layout": {
         "windowWidth": 1280,
