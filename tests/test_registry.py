@@ -3,8 +3,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 from docmaker.models import FileSymbols, Language, SourceFile
 from docmaker.parser.base import BaseParser
 from docmaker.parser.registry import ParserRegistry, get_parser, get_parser_registry

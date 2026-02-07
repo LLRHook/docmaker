@@ -1,6 +1,5 @@
 """Tests for Obsidian vault markdown generation."""
 
-import tempfile
 from pathlib import Path
 
 import pytest

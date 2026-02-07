@@ -8,7 +8,6 @@ from docmaker.models import (
     Annotation,
     ClassDef,
     EndpointDef,
-    FieldDef,
     FileCategory,
     FileSymbols,
     FunctionDef,

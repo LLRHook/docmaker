@@ -2,22 +2,17 @@
 
 import json
 import sys
-import tempfile
 from pathlib import Path
-from unittest import mock
-
-import pytest
 
 from docmaker.app.settings import (
     DEFAULT_SETTINGS,
+    get_editor_command,
     get_settings_dir,
     get_settings_path,
     load_settings,
-    save_settings,
     reset_settings,
-    get_editor_command,
+    save_settings,
 )
-
 
 # --- Path/Directory Tests ---
 
@@ -87,7 +82,8 @@ def test_load_settings_merges_saved_with_defaults(tmp_path, monkeypatch):
     # Custom value should be preserved
     assert settings["graphView"]["scrollSpeed"] == 0.5
     # Default values should be filled in
-    assert settings["graphView"]["zoomSensitivity"] == DEFAULT_SETTINGS["graphView"]["zoomSensitivity"]
+    expected = DEFAULT_SETTINGS["graphView"]["zoomSensitivity"]
+    assert settings["graphView"]["zoomSensitivity"] == expected
     assert settings["appearance"] == DEFAULT_SETTINGS["appearance"]
     assert settings["editor"] == DEFAULT_SETTINGS["editor"]
     assert settings["general"] == DEFAULT_SETTINGS["general"]

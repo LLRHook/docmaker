@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from docmaker.models import FileCategory, Language, SourceFile
+
 # The Go parser is expected to be implemented at this path.
 # Tests are written TDD-style; they will pass once go_parser.py exists.
 from docmaker.parser.go_parser import GoParser
-
-from docmaker.models import FileCategory, Language, SourceFile
 
 
 @pytest.fixture

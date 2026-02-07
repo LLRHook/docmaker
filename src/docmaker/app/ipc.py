@@ -633,7 +633,8 @@ class DocmakerAPI(PyloidIPC):
             end = min(len(lines), end_line)
 
             if start > len(lines):
-                return json.dumps({"error": f"Start line {start_line} exceeds file length ({len(lines)} lines)"})
+                msg = f"Start line {start_line} exceeds file length ({len(lines)} lines)"
+                return json.dumps({"error": msg})
 
             snippet_lines = lines[start - 1 : end]
             snippet = "\n".join(snippet_lines)
