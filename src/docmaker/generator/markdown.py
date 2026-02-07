@@ -52,6 +52,10 @@ class MarkdownGenerator:
             if endpoints_index:
                 generated_files.append(endpoints_index)
 
+        if self.config.generate_moc:
+            moc_files = self._generate_moc_pages()
+            generated_files.extend(moc_files)
+
         return generated_files
 
     def _get_output_path(self, file_symbols: FileSymbols) -> Path:
@@ -104,29 +108,29 @@ class MarkdownGenerator:
         return "\n".join(lines)
 
     def _generate_frontmatter(self, file_symbols: FileSymbols) -> str:
-        """Generate YAML frontmatter."""
+        """Generate YAML frontmatter compatible with Obsidian."""
         tags = [file_symbols.file.language.value, file_symbols.file.category.value]
 
         for cls in file_symbols.classes:
             for ann in cls.annotations:
-                if ann.name in ("RestController", "Controller"):
-                    tags.append("controller")
-                elif ann.name == "Service":
-                    tags.append("service")
-                elif ann.name == "Repository":
-                    tags.append("repository")
-                elif ann.name == "Entity":
-                    tags.append("entity")
-                elif ann.name == "Configuration":
-                    tags.append("configuration")
-                elif ann.name == "interface":
-                    tags.append("interface")
-                elif ann.name == "dataclass":
-                    tags.append("dataclass")
-                elif ann.name == "Component":
-                    tags.append("component")
-                elif ann.name == "Injectable":
-                    tags.append("injectable")
+                tag_map = {
+                    "RestController": "controller",
+                    "Controller": "controller",
+                    "Service": "service",
+                    "Repository": "repository",
+                    "Entity": "entity",
+                    "Configuration": "configuration",
+                    "interface": "interface",
+                    "dataclass": "dataclass",
+                    "Component": "component",
+                    "Injectable": "injectable",
+                }
+                tag = tag_map.get(ann.name)
+                if tag:
+                    tags.append(tag)
+
+        # Collect class names as aliases so [[ClassName]] WikiLinks resolve
+        aliases = [cls.name for cls in file_symbols.classes]
 
         lines = [
             "---",
@@ -134,10 +138,18 @@ class MarkdownGenerator:
             f"path: {file_symbols.file.relative_path}",
             f"language: {file_symbols.file.language.value}",
             f"category: {file_symbols.file.category.value}",
-            f"tags: [{', '.join(tags)}]",
-            f"generated: {datetime.now().isoformat()}",
-            "---\n",
+            "tags:",
         ]
+        for tag in tags:
+            lines.append(f"  - {tag}")
+        if aliases:
+            lines.append("aliases:")
+            for alias in aliases:
+                lines.append(f"  - {alias}")
+        if file_symbols.package:
+            lines.append(f"package: {file_symbols.package}")
+        lines.append(f"generated: {datetime.now().isoformat()}")
+        lines.append("---\n")
         return "\n".join(lines)
 
     def _generate_class_doc(self, cls: ClassDef, file_symbols: FileSymbols) -> str:
@@ -489,6 +501,164 @@ class MarkdownGenerator:
             f.write("\n".join(lines))
 
         return index_path
+
+    def _generate_moc_pages(self) -> list[Path]:
+        """Generate Map of Content (MOC) index pages per package directory.
+
+        Creates a _MOC.md file in each package directory listing all classes,
+        files, and sub-packages in that package. This enables Obsidian's graph
+        view to show package-level navigation.
+        """
+        generated = []
+
+        # Collect packages and their contents
+        packages: dict[str, list[FileSymbols]] = {}
+        for file_symbols in self.symbol_table.files.values():
+            pkg = file_symbols.package or ""
+            if pkg not in packages:
+                packages[pkg] = []
+            packages[pkg].append(file_symbols)
+
+        if not packages:
+            return generated
+
+        # Ensure all ancestor packages exist (even without direct files)
+        all_leaf_packages = set(packages.keys())
+        for pkg in list(all_leaf_packages):
+            parts = pkg.split(".")
+            for i in range(1, len(parts)):
+                ancestor = ".".join(parts[:i])
+                if ancestor not in packages:
+                    packages[ancestor] = []
+
+        # Build package tree for parent/child relationships
+        all_packages = set(packages.keys())
+        package_children: dict[str, set[str]] = {}
+        for pkg in all_packages:
+            if not pkg:
+                continue
+            parts = pkg.rsplit(".", 1)
+            parent = parts[0] if len(parts) > 1 else ""
+            if parent not in package_children:
+                package_children[parent] = set()
+            package_children[parent].add(pkg)
+
+        for pkg, file_symbols_list in sorted(packages.items()):
+            if not pkg and not file_symbols_list:
+                continue
+
+            pkg_name = pkg.split(".")[-1] if pkg else "root"
+            moc_title = f"MOC - {pkg_name}" if pkg else "MOC - Root"
+
+            lines = []
+            lines.append("---")
+            lines.append(f"title: {moc_title}")
+            lines.append("tags:")
+            lines.append("  - MOC")
+            lines.append("  - package")
+            if pkg:
+                lines.append(f"package: {pkg}")
+            lines.append(f"generated: {datetime.now().isoformat()}")
+            lines.append("---\n")
+
+            lines.append(f"# {moc_title}\n")
+
+            if pkg:
+                lines.append(f"> [!info] Package: `{pkg}`\n")
+
+            # Link to parent package
+            if pkg:
+                parts = pkg.rsplit(".", 1)
+                parent_pkg = parts[0] if len(parts) > 1 else ""
+                parent_name = parent_pkg.split(".")[-1] if parent_pkg else "Root"
+                lines.append(f"**Parent:** [[MOC - {parent_name}]]\n")
+
+            # Sub-packages
+            children = sorted(package_children.get(pkg, set()))
+            if children:
+                lines.append("## Sub-packages\n")
+                for child in children:
+                    child_name = child.split(".")[-1]
+                    lines.append(f"- [[MOC - {child_name}]] (`{child}`)")
+                lines.append("")
+
+            # Classes in this package
+            classes_in_pkg = []
+            for fs in file_symbols_list:
+                for cls in fs.classes:
+                    classes_in_pkg.append(cls)
+
+            if classes_in_pkg:
+                lines.append("## Classes\n")
+                for cls in sorted(classes_in_pkg, key=lambda c: c.name):
+                    ann_names = {a.name for a in cls.annotations}
+                    role = ""
+                    if "RestController" in ann_names or "Controller" in ann_names:
+                        role = " `controller`"
+                    elif "Service" in ann_names:
+                        role = " `service`"
+                    elif "Repository" in ann_names:
+                        role = " `repository`"
+                    elif "Entity" in ann_names:
+                        role = " `entity`"
+                    lines.append(f"- [[{cls.name}]]{role}")
+                lines.append("")
+
+            # Standalone functions
+            functions_in_pkg = []
+            for fs in file_symbols_list:
+                for func in fs.functions:
+                    functions_in_pkg.append((func, fs))
+
+            if functions_in_pkg:
+                lines.append("## Functions\n")
+                for func, fs in sorted(functions_in_pkg, key=lambda x: x[0].name):
+                    file_stem = fs.file.relative_path.stem
+                    lines.append(f"- `{func.name}()` in [[{file_stem}]]")
+                lines.append("")
+
+            # Endpoints in this package
+            endpoints_in_pkg = []
+            for fs in file_symbols_list:
+                for ep in fs.endpoints:
+                    endpoints_in_pkg.append(ep)
+
+            if endpoints_in_pkg:
+                lines.append("## Endpoints\n")
+                for ep in sorted(endpoints_in_pkg, key=lambda e: e.path):
+                    badge = self._get_method_badge(ep.http_method)
+                    lines.append(f"- {badge} `{ep.path}` - [[{ep.handler_class}]]")
+                lines.append("")
+
+            # Files list
+            if file_symbols_list:
+                lines.append("## Files\n")
+                for fs in sorted(file_symbols_list, key=lambda f: f.file.relative_path.name):
+                    stem = fs.file.relative_path.stem
+                    lines.append(f"- [[{stem}]] (`{fs.file.relative_path}`)")
+                lines.append("")
+
+            # Determine output path
+            if self.config.mirror_source_structure and file_symbols_list:
+                # Place MOC alongside the files in the mirrored structure
+                first_file = file_symbols_list[0]
+                moc_dir = self.output_dir / first_file.file.relative_path.parent
+            elif pkg:
+                # Use package path as directory
+                moc_dir = self.output_dir / pkg.replace(".", "/")
+            else:
+                moc_dir = self.output_dir
+
+            moc_dir.mkdir(parents=True, exist_ok=True)
+            moc_path = moc_dir / f"MOC - {pkg_name}.md"
+
+            with open(moc_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
+
+            generated.append(moc_path)
+            logger.debug(f"Generated MOC: {moc_path}")
+
+        return generated
 
     def _format_annotation(self, ann: Annotation) -> str:
         """Format an annotation for display."""
