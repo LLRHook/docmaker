@@ -10,7 +10,7 @@ from docmaker.cache import CacheManager
 from docmaker.config import DocmakerConfig
 from docmaker.crawler import FileCrawler
 from docmaker.generator.markdown import MarkdownGenerator
-from docmaker.llm import FileClassifier
+from docmaker.llm import FileClassifier, Summarizer
 from docmaker.models import FileCategory, SourceFile, SymbolTable
 from docmaker.parser.registry import get_parser_registry
 
@@ -25,6 +25,7 @@ class Pipeline:
         self.console = console or Console()
         self.crawler = FileCrawler(config)
         self.classifier = FileClassifier(config.llm)
+        self.summarizer = Summarizer(config.llm)
         self.cache = CacheManager(config.source_dir / config.cache_file)
         self.parser_registry = get_parser_registry()
         self.symbol_table = SymbolTable()
@@ -51,6 +52,8 @@ class Pipeline:
         ]
 
         self._parse_files(relevant_files)
+
+        self._summarize_symbols()
 
         generated = self._generate_docs()
 
@@ -140,6 +143,92 @@ class Pipeline:
             f"[green]OK[/green] Parsed {len(self.symbol_table.files)} files, "
             f"found {len(self.symbol_table.class_index)} classes, "
             f"{len(self.symbol_table.endpoint_index)} endpoints"
+        )
+
+    def _summarize_symbols(self) -> None:
+        """Generate LLM summaries for classes and methods."""
+        if not self.config.llm.enabled:
+            self.console.print("[dim]LLM summarization disabled[/dim]")
+            return
+
+        if not self.summarizer.is_llm_available():
+            self.console.print(
+                "[yellow]Warning: LLM not available, skipping summarization[/yellow]"
+            )
+            return
+
+        if not self.symbol_table.files:
+            return
+
+        total_classes = sum(
+            len(fs.classes) for fs in self.symbol_table.files.values()
+        )
+        total_methods = sum(
+            len(m.methods)
+            for fs in self.symbol_table.files.values()
+            for m in fs.classes
+        ) + sum(len(fs.functions) for fs in self.symbol_table.files.values())
+
+        self.console.print(
+            f"[cyan]Generating LLM summaries for {total_classes} classes "
+            f"and {total_methods} methods...[/cyan]"
+        )
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=self.console,
+        ) as progress:
+            task = progress.add_task("Summarizing...", total=total_classes + total_methods)
+
+            for file_symbols in self.symbol_table.files.values():
+                language = file_symbols.file.language.value
+                for cls in file_symbols.classes:
+                    summary = self.summarizer.summarize_class(cls, language)
+                    if summary:
+                        cls.summary = summary
+                    progress.advance(task)
+
+                    for method in cls.methods:
+                        summary = self.summarizer.summarize_method(
+                            method, cls.name, language
+                        )
+                        if summary:
+                            method.summary = summary
+                        progress.advance(task)
+
+                for func in file_symbols.functions:
+                    summary = self.summarizer.summarize_method(
+                        func, "(module-level)", language
+                    )
+                    if summary:
+                        func.summary = summary
+                    progress.advance(task)
+
+        class_summaries = sum(
+            1
+            for fs in self.symbol_table.files.values()
+            for cls in fs.classes
+            if cls.summary
+        )
+        method_summaries = sum(
+            1
+            for fs in self.symbol_table.files.values()
+            for cls in fs.classes
+            for m in cls.methods
+            if m.summary
+        ) + sum(
+            1
+            for fs in self.symbol_table.files.values()
+            for f in fs.functions
+            if f.summary
+        )
+
+        self.console.print(
+            f"[green]OK[/green] Generated {class_summaries} class summaries "
+            f"and {method_summaries} method summaries"
         )
 
     def _generate_docs(self) -> list[Path]:
