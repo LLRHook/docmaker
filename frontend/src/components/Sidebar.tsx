@@ -7,11 +7,13 @@ interface SidebarProps {
   onNodeSelect: (nodeId: string) => void;
   onFilterChange: (filters: FilterState) => void;
   selectedNodeId: string | null;
+  edgeTypes: Set<string>;
 }
 
 export interface FilterState {
   nodeTypes: Set<string>;
   categories: Set<string>;
+  edgeTypes: Set<string>;
   searchQuery: string;
 }
 
@@ -40,7 +42,7 @@ export interface SidebarHandle {
 
 const COLLAPSED_KEY = "docmaker-sidebar-collapsed";
 
-export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }, ref) {
+export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId, edgeTypes }, ref) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeNodeTypes, setActiveNodeTypes] = useState<Set<string>>(
@@ -87,10 +89,11 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
       onFilterChange({
         nodeTypes: activeNodeTypes,
         categories: activeCategories,
+        edgeTypes,
         searchQuery: "",
       });
     },
-  }), [nodes, activeNodeTypes, activeCategories, searchQuery, onFilterChange]);
+  }), [nodes, activeNodeTypes, activeCategories, edgeTypes, searchQuery, onFilterChange]);
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -114,10 +117,11 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
       onFilterChange({
         nodeTypes: activeNodeTypes,
         categories: activeCategories,
+        edgeTypes,
         searchQuery: query,
       });
     }, 200);
-  }, [activeNodeTypes, activeCategories, onFilterChange]);
+  }, [activeNodeTypes, activeCategories, edgeTypes, onFilterChange]);
 
   const toggleNodeType = (typeId: string) => {
     const newTypes = new Set(activeNodeTypes);
@@ -130,6 +134,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
     onFilterChange({
       nodeTypes: newTypes,
       categories: activeCategories,
+      edgeTypes,
       searchQuery,
     });
   };
@@ -145,6 +150,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
     onFilterChange({
       nodeTypes: activeNodeTypes,
       categories: newCategories,
+      edgeTypes,
       searchQuery,
     });
   };

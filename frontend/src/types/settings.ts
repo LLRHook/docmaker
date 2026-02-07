@@ -1,3 +1,7 @@
+export type EdgeType = "extends" | "implements" | "imports" | "calls" | "contains";
+
+export const ALL_EDGE_TYPES: EdgeType[] = ["extends", "implements", "imports", "calls", "contains"];
+
 export interface GraphViewSettings {
   scrollSpeed: number;
   zoomSensitivity: number;
@@ -7,6 +11,7 @@ export interface GraphViewSettings {
   layoutQuality: "draft" | "default" | "proof";
   nodeSizing: "fixed" | "byType" | "byDegree";
   largeGraphThreshold: number;
+  edgeTypeFilters: Record<EdgeType, boolean>;
 }
 
 export interface AppearanceSettings {
@@ -50,6 +55,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
     layoutQuality: "default",
     nodeSizing: "byDegree",
     largeGraphThreshold: 200,
+    edgeTypeFilters: {
+      extends: true,
+      implements: true,
+      imports: true,
+      calls: true,
+      contains: true,
+    },
   },
   appearance: {
     fontSize: "medium",
