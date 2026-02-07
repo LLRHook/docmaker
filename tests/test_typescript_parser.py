@@ -620,3 +620,5 @@ export function Greeting({ name }: Props): JSX.Element {
 
     function_names = [f.name for f in symbols.functions]
     assert "Greeting" in function_names
+
+
