@@ -15,6 +15,7 @@ import {
   MAX_DETAILS_PANEL_WIDTH,
 } from "./types/settings";
 import { createLogger } from "./utils/logger";
+import { markStart, markEnd, clearMetrics } from "./utils/perf";
 
 const logger = createLogger("App");
 
@@ -41,7 +42,7 @@ export function App() {
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { isAvailable, selectFolder, parseOnly, openFile } = usePyloid();
+  const { isAvailable, selectFolder, parseOnly, openFile, clearCaches } = usePyloid();
   const { settings, updateCategory } = useSettings();
 
   // Check if running in Pyloid (now reactive)
@@ -54,6 +55,9 @@ export function App() {
 
   const handleLoadProject = useCallback(async (path: string) => {
     logger.info("Loading project:", path);
+    clearMetrics();
+    markStart("app:projectLoad");
+    clearCaches();
     setStatus("scanning");
     setStatusMessage("Scanning project files...");
 
@@ -67,6 +71,7 @@ export function App() {
         logger.error("Failed to load project:", result.error);
         setStatus("error");
         setStatusMessage(result.error);
+        markEnd("app:projectLoad");
         return;
       }
 
@@ -80,6 +85,7 @@ export function App() {
       });
       setStatus("ready");
       setStatusMessage(`Loaded ${result.stats.classesFound} classes, ${result.stats.endpointsFound} endpoints`);
+      markEnd("app:projectLoad");
 
       // Save to lastProjectPath in settings
       updateCategory("general", { lastProjectPath: path });
@@ -87,8 +93,9 @@ export function App() {
       logger.error("Exception loading project:", err);
       setStatus("error");
       setStatusMessage(err instanceof Error ? err.message : "Unknown error");
+      markEnd("app:projectLoad");
     }
-  }, [parseOnly, updateCategory]);
+  }, [parseOnly, updateCategory, clearCaches]);
 
   const handleBrowseFolder = useCallback(async () => {
     setShowOpenMenu(false);

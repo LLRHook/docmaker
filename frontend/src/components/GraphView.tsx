@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useMemo } from "react";
+import { memo, useRef, useEffect, useCallback, useMemo } from "react";
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
@@ -7,6 +7,7 @@ import type { FilterState } from "./Sidebar";
 import { useSettings } from "../contexts/SettingsContext";
 import type { GraphViewSettings } from "../types/settings";
 import { ANIMATION_DURATION } from "../types/settings";
+import { markStart, markEnd } from "../utils/perf";
 
 // Register fCOSE extension
 cytoscape.use(fcose);
@@ -123,7 +124,7 @@ const stylesheet: StylesheetDef[] = [
   },
 ];
 
-export function GraphView({
+export const GraphView = memo(function GraphView({
   graph,
   filters,
   selectedNodeId,
@@ -148,6 +149,7 @@ export function GraphView({
 
   // Convert graph data to Cytoscape elements
   const elements = useMemo(() => {
+    markStart("graph:buildElements");
     const nodeElements = graph.nodes
       .filter((node) => {
         // Apply filters
@@ -193,7 +195,9 @@ export function GraphView({
         };
       });
 
-    return [...nodeElements, ...edgeElements];
+    const result = [...nodeElements, ...edgeElements];
+    markEnd("graph:buildElements");
+    return result;
   }, [graph, filters, graphSettings.nodeSizing, nodeDegrees]);
 
   // Handle node selection highlighting
@@ -234,6 +238,7 @@ export function GraphView({
     const animationDuration = ANIMATION_DURATION[graphSettings.animationSpeed];
     const layoutName = graphSettings.defaultLayout;
     const nodeCount = graph.nodes.length;
+    markStart("graph:layout");
     const layout = cy.layout(
       getLayoutOptions(layoutName, {
         nodeCount,
@@ -242,6 +247,7 @@ export function GraphView({
         largeGraphThreshold: graphSettings.largeGraphThreshold,
       })
     );
+    layout.on("layoutstop", () => markEnd("graph:layout"));
     layout.run();
   }, [elements, graphSettings.animationSpeed, graphSettings.defaultLayout, graphSettings.layoutQuality, graphSettings.largeGraphThreshold, graph.nodes.length]);
 
@@ -286,6 +292,7 @@ export function GraphView({
 
     const animationDuration = ANIMATION_DURATION[graphSettings.animationSpeed];
     const nodeCount = graph.nodes.length;
+    markStart("graph:layout");
     const layout = cy.layout(
       getLayoutOptions(layoutName, {
         nodeCount,
@@ -294,6 +301,7 @@ export function GraphView({
         largeGraphThreshold: graphSettings.largeGraphThreshold,
       })
     );
+    layout.on("layoutstop", () => markEnd("graph:layout"));
     layout.run();
   }, [graph.nodes.length, graphSettings.animationSpeed, graphSettings.layoutQuality, graphSettings.largeGraphThreshold]);
 
@@ -429,7 +437,7 @@ export function GraphView({
       )}
     </div>
   );
-}
+});
 
 function getNodeSize(
   node: GraphNode,

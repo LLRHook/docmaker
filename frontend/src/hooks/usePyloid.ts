@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { ipc, pyloidReadyManager } from "pyloid-js";
 import type {
   ScanResult,
@@ -10,6 +10,7 @@ import type {
   CodeGraph,
 } from "../types/graph";
 import { createLogger } from "../utils/logger";
+import { markStart, markEnd } from "../utils/perf";
 
 const logger = createLogger("usePyloid");
 
@@ -20,6 +21,8 @@ interface GenerateOptions {
 
 export function usePyloid() {
   const [ready, setReady] = useState(() => pyloidReadyManager.isReady());
+  const classDetailsCache = useRef(new Map<string, ClassDetails>());
+  const endpointDetailsCache = useRef(new Map<string, EndpointDetails>());
 
   // Wait for Pyloid to be ready (polls for window.__PYLOID__)
   useEffect(() => {
@@ -132,9 +135,11 @@ export function usePyloid() {
 
   const parseOnly = useCallback(async (path: string): Promise<ParseResult> => {
     logger.info("parseOnly called with path:", path);
+    markStart("ipc:parseOnly");
     try {
       const result = await ipc.DocmakerAPI.parse_only(path);
       const parsed = JSON.parse(result);
+      markEnd("ipc:parseOnly");
       if (parsed.error) {
         logger.error("parseOnly error:", parsed.error);
       } else {
@@ -142,6 +147,7 @@ export function usePyloid() {
       }
       return parsed;
     } catch (error) {
+      markEnd("ipc:parseOnly");
       logger.error("parseOnly failed:", error);
       return {
         success: false,
@@ -183,15 +189,23 @@ export function usePyloid() {
   }, []);
 
   const getClassDetails = useCallback(async (classFqn: string): Promise<ClassDetails> => {
+    const cached = classDetailsCache.current.get(classFqn);
+    if (cached) return cached;
+
     logger.debug("getClassDetails called:", classFqn);
+    markStart("details:fetchClass");
     try {
       const result = await ipc.DocmakerAPI.get_class_details(classFqn);
       const parsed = JSON.parse(result);
+      markEnd("details:fetchClass");
       if (parsed.error) {
         logger.error("getClassDetails error:", parsed.error);
+      } else {
+        classDetailsCache.current.set(classFqn, parsed);
       }
       return parsed;
     } catch (error) {
+      markEnd("details:fetchClass");
       logger.error("getClassDetails failed:", error);
       return {
         name: "", fqn: "", path: "", line: 0, endLine: 0,
@@ -203,15 +217,23 @@ export function usePyloid() {
   }, []);
 
   const getEndpointDetails = useCallback(async (endpointKey: string): Promise<EndpointDetails> => {
+    const cached = endpointDetailsCache.current.get(endpointKey);
+    if (cached) return cached;
+
     logger.debug("getEndpointDetails called:", endpointKey);
+    markStart("details:fetchEndpoint");
     try {
       const result = await ipc.DocmakerAPI.get_endpoint_details(endpointKey);
       const parsed = JSON.parse(result);
+      markEnd("details:fetchEndpoint");
       if (parsed.error) {
         logger.error("getEndpointDetails error:", parsed.error);
+      } else {
+        endpointDetailsCache.current.set(endpointKey, parsed);
       }
       return parsed;
     } catch (error) {
+      markEnd("details:fetchEndpoint");
       logger.error("getEndpointDetails failed:", error);
       return {
         httpMethod: "", path: "", handlerClass: "", handlerMethod: "",
@@ -299,6 +321,11 @@ export function usePyloid() {
     }
   }, []);
 
+  const clearCaches = useCallback(() => {
+    classDetailsCache.current.clear();
+    endpointDetailsCache.current.clear();
+  }, []);
+
   return {
     isAvailable,
     selectFolder,
@@ -315,5 +342,6 @@ export function usePyloid() {
     resetSettings,
     resizeWindow,
     getWindowSize,
+    clearCaches,
   };
 }
