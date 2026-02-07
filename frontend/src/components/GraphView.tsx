@@ -129,6 +129,31 @@ const stylesheet: StylesheetDef[] = [
       width: 3,
     },
   },
+  {
+    selector: ":parent",
+    style: {
+      "background-color": "#1e293b",
+      "background-opacity": 0.3,
+      "border-color": "#475569",
+      "border-width": 1,
+      "shape": "roundrectangle",
+      padding: "20px",
+      "text-valign": "top",
+      "text-halign": "center",
+      "font-size": "11px",
+      color: "#94a3b8",
+      "text-outline-width": 0,
+    },
+  },
+  {
+    selector: "node[?collapsed]",
+    style: {
+      "border-width": 2,
+      "border-color": "#6b7280",
+      "border-style": "dashed",
+      "shape": "roundrectangle",
+    },
+  },
 ];
 
 interface TooltipState {
@@ -166,6 +191,12 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   const [cyInstance, setCyInstance] = useState<Core | null>(null);
   const [showMinimap, setShowMinimap] = useState(true);
 
+  // Package clustering state
+  const [clusteringEnabled, setClusteringEnabled] = useState(true);
+  const [collapsedPackages, setCollapsedPackages] = useState<Set<string>>(() => new Set());
+  const clusteringEnabledRef = useRef(clusteringEnabled);
+  clusteringEnabledRef.current = clusteringEnabled;
+
   // Close export menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -202,6 +233,18 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
     },
   }), []);
 
+  // Initialize collapsed packages when graph changes
+  useEffect(() => {
+    if (clusteringEnabled) {
+      const pkgIds = new Set(
+        graph.nodes.filter((n) => n.type === "package").map((n) => n.id)
+      );
+      setCollapsedPackages(pkgIds);
+    } else {
+      setCollapsedPackages(new Set());
+    }
+  }, [graph, clusteringEnabled]);
+
   // Calculate node degrees (connection count) for sizing
   const nodeDegrees = useMemo(() => {
     const degrees = new Map<string, number>();
@@ -216,55 +259,167 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   // Convert graph data to Cytoscape elements
   const elements = useMemo(() => {
     markStart("graph:buildElements");
-    const nodeElements = graph.nodes
-      .filter((node) => {
-        // Apply filters
-        if (!filters.nodeTypes.has(node.type)) return false;
-        const category = node.metadata.category || "unknown";
-        if (!filters.categories.has(category)) return false;
-        if (filters.searchQuery) {
-          const query = filters.searchQuery.toLowerCase();
-          const matchesLabel = node.label.toLowerCase().includes(query);
-          const matchesFqn = node.metadata.fqn?.toLowerCase().includes(query) ?? false;
-          if (!matchesLabel && !matchesFqn) return false;
+
+    // Filter nodes
+    const filteredNodes = graph.nodes.filter((node) => {
+      if (!filters.nodeTypes.has(node.type)) return false;
+      const category = node.metadata.category || "unknown";
+      if (!filters.categories.has(category)) return false;
+      if (filters.searchQuery) {
+        const query = filters.searchQuery.toLowerCase();
+        const matchesLabel = node.label.toLowerCase().includes(query);
+        const matchesFqn = node.metadata.fqn?.toLowerCase().includes(query) ?? false;
+        if (!matchesLabel && !matchesFqn) return false;
+      }
+      return true;
+    });
+
+    const nodeElements: { data: Record<string, unknown> }[] = [];
+    const visibleNodeIds = new Set<string>();
+    let collapsedChildToPackage: Map<string, string> | null = null;
+
+    if (clusteringEnabled) {
+      // Build package map: package name -> package node id
+      const packageNameToId = new Map<string, string>();
+      const packageChildCounts = new Map<string, number>();
+
+      for (const node of filteredNodes) {
+        if (node.type === "package") {
+          const pkgName = node.id.replace(/^pkg:/, "");
+          packageNameToId.set(pkgName, node.id);
+          packageChildCounts.set(node.id, 0);
         }
-        return true;
-      })
-      .map((node) => ({
-        data: {
-          id: node.id,
-          label: node.label,
-          color: NODE_COLORS[node.type] || "#6b7280",
-          shape: NODE_SHAPES[node.type] || "ellipse",
-          size: getNodeSize(node, graphSettings.nodeSizing, nodeDegrees.get(node.id) || 0),
-          nodeType: node.type,
-          ...node.metadata,
-        },
-      }));
+      }
 
-    // Create a set of visible node IDs for edge filtering
-    const visibleNodeIds = new Set(nodeElements.map((n) => n.data.id));
+      // Count children per package
+      for (const node of filteredNodes) {
+        if (node.type !== "package" && node.metadata.package) {
+          const pkgId = packageNameToId.get(node.metadata.package);
+          if (pkgId) {
+            packageChildCounts.set(pkgId, (packageChildCounts.get(pkgId) || 0) + 1);
+          }
+        }
+      }
 
-    const edgeElements = graph.edges
-      .filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
-      .map((edge) => {
-        const style = EDGE_STYLES[edge.type] || DEFAULT_EDGE_STYLE;
-        return {
+      // Build collapsed child map for edge rerouting
+      collapsedChildToPackage = new Map();
+      for (const node of filteredNodes) {
+        if (node.type !== "package" && node.metadata.package) {
+          const pkgId = packageNameToId.get(node.metadata.package);
+          if (pkgId && collapsedPackages.has(pkgId)) {
+            collapsedChildToPackage.set(node.id, pkgId);
+          }
+        }
+      }
+
+      for (const node of filteredNodes) {
+        if (node.type === "package") {
+          const isCollapsed = collapsedPackages.has(node.id);
+          const childCount = packageChildCounts.get(node.id) || 0;
+          const label = isCollapsed && childCount > 0
+            ? `${node.label} (${childCount})`
+            : node.label;
+
+          visibleNodeIds.add(node.id);
+          nodeElements.push({
+            data: {
+              id: node.id,
+              label,
+              color: NODE_COLORS.package,
+              shape: "roundrectangle",
+              size: isCollapsed
+                ? Math.max(40, 30 + childCount * 3)
+                : getNodeSize(node, graphSettings.nodeSizing, nodeDegrees.get(node.id) || 0),
+              nodeType: "package",
+              collapsed: isCollapsed,
+              ...node.metadata,
+            },
+          });
+        } else {
+          const pkgId = node.metadata.package
+            ? packageNameToId.get(node.metadata.package)
+            : undefined;
+
+          // Skip children inside collapsed packages
+          if (pkgId && collapsedPackages.has(pkgId)) continue;
+
+          visibleNodeIds.add(node.id);
+          nodeElements.push({
+            data: {
+              id: node.id,
+              label: node.label,
+              color: NODE_COLORS[node.type] || "#6b7280",
+              shape: NODE_SHAPES[node.type] || "ellipse",
+              size: getNodeSize(node, graphSettings.nodeSizing, nodeDegrees.get(node.id) || 0),
+              nodeType: node.type,
+              ...node.metadata,
+              ...(pkgId ? { parent: pkgId } : {}),
+            },
+          });
+        }
+      }
+    } else {
+      // Non-clustered mode (original behavior)
+      for (const node of filteredNodes) {
+        visibleNodeIds.add(node.id);
+        nodeElements.push({
           data: {
-            // Stable edge ID based on content, not index
-            id: `${edge.source}-${edge.type}-${edge.target}`,
-            source: edge.source,
-            target: edge.target,
-            edgeType: edge.type,
-            ...style,
+            id: node.id,
+            label: node.label,
+            color: NODE_COLORS[node.type] || "#6b7280",
+            shape: NODE_SHAPES[node.type] || "ellipse",
+            size: getNodeSize(node, graphSettings.nodeSizing, nodeDegrees.get(node.id) || 0),
+            nodeType: node.type,
+            ...node.metadata,
           },
-        };
+        });
+      }
+    }
+
+    // Build edges with rerouting for collapsed packages
+    const edgeSet = new Set<string>();
+    const edgeElements: { data: Record<string, unknown> }[] = [];
+
+    for (const edge of graph.edges) {
+      // Skip "contains" edges when clustering (containment is structural)
+      if (clusteringEnabled && edge.type === "contains") continue;
+
+      let source = edge.source;
+      let target = edge.target;
+
+      // Reroute edges for collapsed packages
+      if (collapsedChildToPackage) {
+        const rSource = collapsedChildToPackage.get(source);
+        const rTarget = collapsedChildToPackage.get(target);
+        if (rSource) source = rSource;
+        if (rTarget) target = rTarget;
+      }
+
+      // Skip self-edges and edges to non-visible nodes
+      if (source === target) continue;
+      if (!visibleNodeIds.has(source) || !visibleNodeIds.has(target)) continue;
+
+      // Deduplicate rerouted edges
+      const edgeKey = `${source}-${edge.type}-${target}`;
+      if (edgeSet.has(edgeKey)) continue;
+      edgeSet.add(edgeKey);
+
+      const style = EDGE_STYLES[edge.type] || DEFAULT_EDGE_STYLE;
+      edgeElements.push({
+        data: {
+          id: edgeKey,
+          source,
+          target,
+          edgeType: edge.type,
+          ...style,
+        },
       });
+    }
 
     const result = [...nodeElements, ...edgeElements];
     markEnd("graph:buildElements");
     return result;
-  }, [graph, filters, graphSettings.nodeSizing, nodeDegrees]);
+  }, [graph, filters, graphSettings.nodeSizing, nodeDegrees, clusteringEnabled, collapsedPackages]);
 
   // Handle node selection highlighting
   useEffect(() => {
@@ -295,10 +450,10 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
     }
   }, [selectedNodeId]);
 
-  // Fit graph when elements change significantly
+  // Run layout when graph data or layout settings change (not on collapse/expand)
   useEffect(() => {
     const cy = cyRef.current;
-    if (!cy || elements.length === 0) return;
+    if (!cy || graph.nodes.length === 0) return;
 
     // Run layout with animation settings
     const animationDuration = ANIMATION_DURATION[graphSettings.animationSpeed];
@@ -315,7 +470,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
     );
     layout.on("layoutstop", () => markEnd("graph:layout"));
     layout.run();
-  }, [elements, graphSettings.animationSpeed, graphSettings.defaultLayout, graphSettings.layoutQuality, graphSettings.largeGraphThreshold, graph.nodes.length]);
+  }, [graph, graphSettings.animationSpeed, graphSettings.defaultLayout, graphSettings.layoutQuality, graphSettings.largeGraphThreshold]);
 
   const handleCyInit = useCallback((cy: Core) => {
     cyRef.current = cy;
@@ -324,6 +479,21 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
     // Node click handler
     cy.on("tap", "node", (event: EventObject) => {
       const nodeId = event.target.id();
+      const nodeType = event.target.data("nodeType");
+
+      // Toggle package collapse when clustering is enabled
+      if (clusteringEnabledRef.current && nodeType === "package") {
+        setCollapsedPackages((prev) => {
+          const next = new Set(prev);
+          if (next.has(nodeId)) {
+            next.delete(nodeId);
+          } else {
+            next.add(nodeId);
+          }
+          return next;
+        });
+      }
+
       onNodeSelect(nodeId);
     });
 
@@ -573,6 +743,40 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
           </svg>
         </button>
+
+        {/* Package clustering toggle */}
+        <button
+          onClick={() => setClusteringEnabled(!clusteringEnabled)}
+          className={`bg-gray-800 rounded-lg shadow-lg px-3 py-2 text-sm hover:bg-gray-700 ${clusteringEnabled ? "text-blue-400" : "text-gray-300"}`}
+          title="Toggle package clustering"
+        >
+          Cluster
+        </button>
+
+        {/* Expand/Collapse all packages */}
+        {clusteringEnabled && (
+          <div className="bg-gray-800 rounded-lg shadow-lg flex">
+            <button
+              onClick={() => {
+                const pkgIds = new Set(
+                  graph.nodes.filter((n) => n.type === "package").map((n) => n.id)
+                );
+                setCollapsedPackages(pkgIds);
+              }}
+              className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-l-lg"
+              title="Collapse all packages"
+            >
+              Collapse All
+            </button>
+            <button
+              onClick={() => setCollapsedPackages(new Set())}
+              className="px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-r-lg border-l border-gray-700"
+              title="Expand all packages"
+            >
+              Expand All
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Legend */}
