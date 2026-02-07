@@ -52,6 +52,9 @@ class MarkdownGenerator:
             if endpoints_index:
                 generated_files.append(endpoints_index)
 
+            moc_paths = self._generate_package_mocs()
+            generated_files.extend(moc_paths)
+
         return generated_files
 
     def _get_output_path(self, file_symbols: FileSymbols) -> Path:
@@ -161,6 +164,9 @@ class MarkdownGenerator:
             iface_links = [self.linker.get_wikilink(i, file_symbols) for i in cls.interfaces]
             lines.append(f"**Implements:** {', '.join(iface_links)}\n")
 
+        if cls.summary:
+            lines.append(f"**Summary:** {cls.summary}\n")
+
         if cls.docstring:
             lines.append(f"> {cls.docstring}\n")
 
@@ -214,6 +220,9 @@ class MarkdownGenerator:
             ret_link = self.linker.get_wikilink(method.return_type, file_symbols)
             lines.append(f"**Returns:** {ret_link}\n")
 
+        if method.summary:
+            lines.append(f"**Summary:** {method.summary}\n")
+
         if method.docstring:
             lines.append(f"> {method.docstring}\n")
 
@@ -256,6 +265,9 @@ class MarkdownGenerator:
         if func.return_type:
             ret_link = self.linker.get_wikilink(func.return_type, file_symbols)
             lines.append(f"**Returns:** {ret_link}\n")
+
+        if func.summary:
+            lines.append(f"**Summary:** {func.summary}\n")
 
         if func.docstring:
             lines.append(f"> {func.docstring}\n")
@@ -489,6 +501,96 @@ class MarkdownGenerator:
             f.write("\n".join(lines))
 
         return index_path
+
+    def _generate_package_mocs(self) -> list[Path]:
+        """Generate Map of Content index pages per package."""
+        packages: dict[str, list[FileSymbols]] = {}
+
+        for file_symbols in self.symbol_table.files.values():
+            pkg = file_symbols.package
+            if not pkg:
+                parent = str(file_symbols.file.relative_path.parent)
+                pkg = parent if parent != "." else "(root)"
+            if pkg not in packages:
+                packages[pkg] = []
+            packages[pkg].append(file_symbols)
+
+        moc_paths = []
+        for pkg, file_list in sorted(packages.items()):
+            lines = []
+
+            lines.append("---")
+            lines.append(f"title: \"{pkg}\"")
+            lines.append("type: moc")
+            lines.append(f"generated: {datetime.now().isoformat()}")
+            lines.append("---\n")
+
+            lines.append(f"# {pkg}\n")
+            lines.append(f"*Map of Content for package `{pkg}`*\n")
+
+            all_classes = []
+            all_functions = []
+            all_endpoints = []
+            for fs in file_list:
+                all_classes.extend(fs.classes)
+                all_functions.extend(fs.functions)
+                all_endpoints.extend(fs.endpoints)
+
+            lines.append("## Overview\n")
+            lines.append(f"- **Files:** {len(file_list)}")
+            lines.append(f"- **Classes:** {len(all_classes)}")
+            lines.append(f"- **Functions:** {len(all_functions)}")
+            if all_endpoints:
+                lines.append(f"- **Endpoints:** {len(all_endpoints)}")
+            lines.append("")
+
+            if all_classes:
+                lines.append("## Classes\n")
+                for cls in sorted(all_classes, key=lambda c: c.name):
+                    summary_text = f" - {cls.summary}" if cls.summary else ""
+                    lines.append(f"- [[{cls.name}]]{summary_text}")
+                lines.append("")
+
+            if all_functions:
+                lines.append("## Functions\n")
+                for func in sorted(all_functions, key=lambda f: f.name):
+                    lines.append(f"- `{func.name}()`")
+                lines.append("")
+
+            if all_endpoints:
+                lines.append("## Endpoints\n")
+                lines.append("| Method | Path | Handler |")
+                lines.append("|--------|------|---------|")
+                for ep in sorted(all_endpoints, key=lambda e: e.path):
+                    badge = self._get_method_badge(ep.http_method)
+                    lines.append(
+                        f"| {badge} | `{ep.path}` | [[{ep.handler_class}#{ep.handler_method}]] |"
+                    )
+                lines.append("")
+
+            lines.append("## Files\n")
+            for fs in sorted(file_list, key=lambda f: str(f.file.relative_path)):
+                stem = fs.file.relative_path.stem
+                lines.append(f"- [[{stem}]] (`{fs.file.relative_path}`)")
+            lines.append("")
+
+            safe_name = pkg.replace(".", "/").replace(" ", "_")
+            if self.config.mirror_source_structure:
+                moc_dir = self.output_dir / safe_name
+            else:
+                moc_dir = self.output_dir
+            moc_dir.mkdir(parents=True, exist_ok=True)
+
+            moc_filename = f"_MOC_{pkg.split('.')[-1]}.md"
+            moc_path = moc_dir / moc_filename
+
+            with open(moc_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
+
+            moc_paths.append(moc_path)
+            logger.debug(f"Generated MOC: {moc_path}")
+
+        return moc_paths
 
     def _format_annotation(self, ann: Annotation) -> str:
         """Format an annotation for display."""

@@ -10,7 +10,7 @@ from docmaker.cache import CacheManager
 from docmaker.config import DocmakerConfig
 from docmaker.crawler import FileCrawler
 from docmaker.generator.markdown import MarkdownGenerator
-from docmaker.llm import FileClassifier
+from docmaker.llm import FileClassifier, SymbolSummarizer
 from docmaker.models import FileCategory, SourceFile, SymbolTable
 from docmaker.parser.registry import get_parser_registry
 
@@ -25,6 +25,7 @@ class Pipeline:
         self.console = console or Console()
         self.crawler = FileCrawler(config)
         self.classifier = FileClassifier(config.llm)
+        self.summarizer = SymbolSummarizer(config.llm)
         self.cache = CacheManager(config.source_dir / config.cache_file)
         self.parser_registry = get_parser_registry()
         self.symbol_table = SymbolTable()
@@ -51,6 +52,8 @@ class Pipeline:
         ]
 
         self._parse_files(relevant_files)
+
+        self._summarize_symbols()
 
         generated = self._generate_docs()
 
@@ -140,6 +143,65 @@ class Pipeline:
             f"[green]OK[/green] Parsed {len(self.symbol_table.files)} files, "
             f"found {len(self.symbol_table.class_index)} classes, "
             f"{len(self.symbol_table.endpoint_index)} endpoints"
+        )
+
+    def _summarize_symbols(self) -> None:
+        """Generate LLM summaries for classes and functions."""
+        if not self.config.llm.enabled:
+            self.console.print("[dim]LLM summarization disabled[/dim]")
+            return
+
+        if not self.summarizer.is_available():
+            self.console.print("[yellow]Warning: LLM not available for summarization[/yellow]")
+            return
+
+        classes = list(self.symbol_table.class_index.values())
+        functions = [
+            (func, None)
+            for func in self.symbol_table.function_index.values()
+            if not any(
+                func in cls.methods for cls in self.symbol_table.class_index.values()
+            )
+        ]
+        for cls in classes:
+            for method in cls.methods:
+                functions.append((method, cls.name))
+
+        total = len(classes) + len(functions)
+        if total == 0:
+            return
+
+        self.console.print(
+            f"[cyan]Summarizing {len(classes)} classes "
+            f"and {len(functions)} functions with LLM...[/cyan]"
+        )
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=self.console,
+        ) as progress:
+            task = progress.add_task("Summarizing...", total=total)
+
+            for cls in classes:
+                summary = self.summarizer.summarize_class(cls)
+                if summary:
+                    cls.summary = summary
+                progress.advance(task)
+
+            for func, class_name in functions:
+                summary = self.summarizer.summarize_function(func, class_name)
+                if summary:
+                    func.summary = summary
+                progress.advance(task)
+
+        summarized_classes = sum(1 for c in classes if c.summary)
+        summarized_funcs = sum(1 for f, _ in functions if f.summary)
+        self.console.print(
+            f"[green]OK[/green] Summarized {summarized_classes} classes, "
+            f"{summarized_funcs} functions"
         )
 
     def _generate_docs(self) -> list[Path]:

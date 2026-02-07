@@ -1,4 +1,4 @@
-"""LLM integration for file classification."""
+"""LLM integration for file classification and symbol summarization."""
 
 import logging
 from abc import ABC, abstractmethod
@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 import httpx
 
 from docmaker.config import LLMConfig
-from docmaker.models import FileCategory, SourceFile
+from docmaker.models import ClassDef, FileCategory, FunctionDef, SourceFile
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,45 @@ Code snippet (first {num_lines} lines):
 Respond with ONLY one word: BACKEND, FRONTEND, CONFIG, TEST, or IGNORE
 """
 
+CLASS_SUMMARY_PROMPT = """\
+You are a technical documentation writer. Write a concise summary of this class.
+
+Class: {class_name}
+Package: {package}
+Superclass: {superclass}
+Interfaces: {interfaces}
+Annotations: {annotations}
+Fields: {fields}
+Methods: {methods}
+
+Source code:
+```
+{source_code}
+```
+
+Write a 2-3 sentence natural-language summary describing what this class does, its role in the \
+application, and its key responsibilities. Be specific and technical. Do not start with \
+"This class" - start with what it does.
+"""
+
+FUNCTION_SUMMARY_PROMPT = """You are a technical documentation writer. Write a concise summary \
+of this function/method.
+
+Function: {function_name}
+Class: {class_name}
+Parameters: {parameters}
+Return type: {return_type}
+Annotations: {annotations}
+
+Source code:
+```
+{source_code}
+```
+
+Write a 1-2 sentence natural-language summary describing what this function does and why. \
+Be specific and technical. Do not start with "This function" - start with what it does.
+"""
+
 
 class LLMProvider(ABC):
     """Abstract base class for LLM providers."""
@@ -44,6 +83,47 @@ class LLMProvider(ABC):
     def is_available(self) -> bool:
         """Check if the LLM provider is available."""
         pass
+
+    @abstractmethod
+    def summarize(self, prompt: str) -> str | None:
+        """Send a summarization prompt and return the response text."""
+        pass
+
+    def summarize_class(self, cls: ClassDef) -> str | None:
+        """Generate a natural-language summary for a class."""
+        prompt = CLASS_SUMMARY_PROMPT.format(
+            class_name=cls.name,
+            package=cls.package or "N/A",
+            superclass=cls.superclass or "None",
+            interfaces=", ".join(cls.interfaces) if cls.interfaces else "None",
+            annotations=(
+                ", ".join(f"@{a.name}" for a in cls.annotations) if cls.annotations else "None"
+            ),
+            fields=", ".join(f.name for f in cls.fields) if cls.fields else "None",
+            methods=(
+                ", ".join(m.name for m in cls.methods) if cls.methods else "None"
+            ),
+            source_code=cls.source_code[:3000],
+        )
+        return self.summarize(prompt)
+
+    def summarize_function(self, func: FunctionDef, class_name: str | None = None) -> str | None:
+        """Generate a natural-language summary for a function/method."""
+        prompt = FUNCTION_SUMMARY_PROMPT.format(
+            function_name=func.name,
+            class_name=class_name or "N/A (module-level)",
+            parameters=", ".join(
+                f"{p.name}: {p.type or 'Any'}" for p in func.parameters
+            ) if func.parameters else "None",
+            return_type=func.return_type or "None",
+            annotations=(
+                ", ".join(f"@{a.name}" for a in func.annotations)
+                if func.annotations
+                else "None"
+            ),
+            source_code=func.source_code[:3000],
+        )
+        return self.summarize(prompt)
 
     def _parse_category(self, answer: str) -> FileCategory:
         """Parse the LLM response into a FileCategory."""
@@ -101,6 +181,25 @@ class OllamaProvider(LLMProvider):
             logger.warning(f"LLM classification failed for {file.relative_path}: {e}")
             return file.category
 
+    def summarize(self, prompt: str) -> str | None:
+        """Send a summarization prompt to Ollama."""
+        try:
+            with httpx.Client(timeout=self.config.timeout) as client:
+                response = client.post(
+                    f"{self.base_url}/api/generate",
+                    json={
+                        "model": self.config.model,
+                        "prompt": prompt,
+                        "stream": False,
+                    },
+                )
+                response.raise_for_status()
+                result = response.json()
+                return result.get("response", "").strip() or None
+        except Exception as e:
+            logger.warning(f"LLM summarization failed: {e}")
+            return None
+
 
 class LMStudioProvider(LLMProvider):
     """LM Studio provider (OpenAI-compatible API)."""
@@ -152,6 +251,31 @@ class LMStudioProvider(LLMProvider):
             logger.warning(f"LLM classification failed for {file.relative_path}: {e}")
             return file.category
 
+    def summarize(self, prompt: str) -> str | None:
+        """Send a summarization prompt to LM Studio."""
+        try:
+            with httpx.Client(timeout=self.config.timeout) as client:
+                response = client.post(
+                    f"{self.base_url}/chat/completions",
+                    json={
+                        "model": self.config.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 200,
+                        "temperature": 0.3,
+                    },
+                )
+                response.raise_for_status()
+                result = response.json()
+                return (
+                    result.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                    .strip()
+                ) or None
+        except Exception as e:
+            logger.warning(f"LLM summarization failed: {e}")
+            return None
+
 
 class OpenAIProvider(LLMProvider):
     """OpenAI API provider."""
@@ -199,6 +323,32 @@ class OpenAIProvider(LLMProvider):
             logger.warning(f"LLM classification failed for {file.relative_path}: {e}")
             return file.category
 
+    def summarize(self, prompt: str) -> str | None:
+        """Send a summarization prompt to OpenAI."""
+        try:
+            with httpx.Client(timeout=self.config.timeout) as client:
+                response = client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {self.config.api_key}"},
+                    json={
+                        "model": self.config.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 200,
+                        "temperature": 0.3,
+                    },
+                )
+                response.raise_for_status()
+                result = response.json()
+                return (
+                    result.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                    .strip()
+                ) or None
+        except Exception as e:
+            logger.warning(f"LLM summarization failed: {e}")
+            return None
+
 
 class NoOpProvider(LLMProvider):
     """No-op provider when LLM is disabled."""
@@ -208,6 +358,9 @@ class NoOpProvider(LLMProvider):
 
     def classify(self, file: SourceFile) -> FileCategory:
         return file.category
+
+    def summarize(self, prompt: str) -> str | None:
+        return None
 
 
 def create_llm_provider(config: LLMConfig) -> LLMProvider:
@@ -259,3 +412,32 @@ class FileClassifier:
         for file in files:
             file.category = self.classify(file)
         return files
+
+
+class SymbolSummarizer:
+    """Generates natural-language summaries for code symbols using LLM."""
+
+    def __init__(self, config: LLMConfig):
+        self.config = config
+        self.provider = create_llm_provider(config)
+        self._llm_available: bool | None = None
+
+    def is_available(self) -> bool:
+        """Check if the LLM provider is available for summarization."""
+        if self._llm_available is None:
+            self._llm_available = self.provider.is_available()
+        return self._llm_available
+
+    def summarize_class(self, cls: ClassDef) -> str | None:
+        """Generate a summary for a class definition."""
+        if not self.config.enabled or not self.is_available():
+            return None
+        return self.provider.summarize_class(cls)
+
+    def summarize_function(
+        self, func: FunctionDef, class_name: str | None = None
+    ) -> str | None:
+        """Generate a summary for a function/method definition."""
+        if not self.config.enabled or not self.is_available():
+            return None
+        return self.provider.summarize_function(func, class_name)
