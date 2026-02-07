@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 interface OnboardingWizardProps {
   onSelectFolder: () => Promise<void>;
@@ -28,14 +28,11 @@ export function OnboardingWizard({
   }, [onSelectFolder]);
 
   // Auto-advance from loading to results when project is loaded
-  if (step === "loading" && projectLoaded && loadStatus === "ready") {
-    setStep("results");
-  }
-
-  // Handle error during loading - allow retry
-  if (step === "loading" && loadStatus === "error") {
-    // Stay on loading step but show error
-  }
+  useEffect(() => {
+    if (step === "loading" && projectLoaded && loadStatus === "ready") {
+      setStep("results");
+    }
+  }, [step, projectLoaded, loadStatus]);
 
   return (
     <div className="fixed inset-0 z-50 bg-gray-900/95 flex items-center justify-center">
