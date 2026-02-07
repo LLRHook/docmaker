@@ -32,6 +32,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
   const defaultFilters: FilterState = {
     nodeTypes: new Set(["class", "interface", "endpoint", "package", "file"]),
     categories: new Set(["backend", "frontend", "config", "test", "unknown"]),
+    edgeTypes: new Set(["extends", "implements", "imports", "calls", "contains"]),
     searchQuery: "",
   };
 
@@ -455,6 +456,7 @@ function ExploreStep({ graph, filters, graphRef, showTips, onDismissTips, onFini
           selectedNodeId={null}
           onNodeSelect={() => {}}
           onNodeDoubleClick={() => {}}
+          onEdgeTypeToggle={() => {}}
         />
 
         {/* Tips overlay */}

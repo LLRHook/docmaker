@@ -14,7 +14,7 @@ import { useDropZone } from "./hooks/useDropZone";
 import { useSettings } from "./contexts/SettingsContext";
 import { useNavigationHistory } from "./hooks/useNavigationHistory";
 import { useKeyboardNavigation, type KeyboardNavigationCallbacks } from "./hooks/useKeyboardNavigation";
-import type { CodeGraph, GraphNode, EdgeType } from "./types/graph";
+import type { CodeGraph, GraphNode } from "./types/graph";
 import type { RecentProject } from "./types/settings";
 import {
   MIN_SIDEBAR_WIDTH,
@@ -237,18 +237,6 @@ export function App() {
 
   const handleToggleDetailsPanel = useCallback(() => {
     setDetailsPanelCollapsed((prev) => !prev);
-  }, []);
-
-  const handleEdgeTypeToggle = useCallback((edgeType: EdgeType) => {
-    setFilters((prev) => {
-      const newEdgeTypes = new Set(prev.edgeTypes);
-      if (newEdgeTypes.has(edgeType)) {
-        newEdgeTypes.delete(edgeType);
-      } else {
-        newEdgeTypes.add(edgeType);
-      }
-      return { ...prev, edgeTypes: newEdgeTypes };
-    });
   }, []);
 
   const handleSidebarWidthChange = useCallback(

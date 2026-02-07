@@ -3,11 +3,10 @@ import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
 import type { CodeGraph, GraphNode, EdgeType } from "../types/graph";
-import { EDGE_TYPES } from "../types/graph";
 import type { FilterState } from "./Sidebar";
 import { useSettings } from "../contexts/SettingsContext";
-import type { GraphViewSettings, EdgeTypeFilters } from "../types/settings";
-import { ANIMATION_DURATION, EDGE_TYPE_COLORS } from "../types/settings";
+import type { GraphViewSettings } from "../types/settings";
+import { ANIMATION_DURATION } from "../types/settings";
 import { markStart, markEnd } from "../utils/perf";
 import { GraphMinimap } from "./GraphMinimap";
 import { useLayoutWorker } from "../hooks/useLayoutWorker";
@@ -135,47 +134,47 @@ function buildStylesheet(largeGraph: boolean): StylesheetDef[] {
         width: 3,
       },
     },
-  },
-  // Search highlighting styles
-  {
-    selector: "node.search-match",
-    style: {
-      "border-width": 3,
-      "border-color": "#22d3ee",
-      "background-opacity": 1,
+    // Search highlighting styles
+    {
+      selector: "node.search-match",
+      style: {
+        "border-width": 3,
+        "border-color": "#22d3ee",
+        "background-opacity": 1,
+      },
     },
-  },
-  {
-    selector: "node.search-dimmed",
-    style: {
-      opacity: 0.2,
+    {
+      selector: "node.search-dimmed",
+      style: {
+        opacity: 0.2,
+      },
     },
-  },
-  {
-    selector: "edge.search-dimmed",
-    style: {
-      opacity: 0.05,
+    {
+      selector: "edge.search-dimmed",
+      style: {
+        opacity: 0.05,
+      },
     },
-  },
-  // Compound node (package cluster) styles
-  {
-    selector: ":parent",
-    style: {
-      "background-color": "#1f2937",
-      "background-opacity": 0.6,
-      "border-color": "#4b5563",
-      "border-width": 1,
-      "border-style": "dashed" as unknown,
-      label: "data(label)",
-      "text-valign": "top",
-      "text-halign": "center",
-      "font-size": "12px",
-      color: "#9ca3af",
-      "text-margin-y": -8,
-      padding: "20px",
+    // Compound node (package cluster) styles
+    {
+      selector: ":parent",
+      style: {
+        "background-color": "#1f2937",
+        "background-opacity": 0.6,
+        "border-color": "#4b5563",
+        "border-width": 1,
+        "border-style": "dashed" as unknown,
+        label: "data(label)",
+        "text-valign": "top",
+        "text-halign": "center",
+        "font-size": "12px",
+        color: "#9ca3af",
+        "text-margin-y": -8,
+        padding: "20px",
+      },
     },
-  },
-];
+  ];
+}
 
 interface TooltipState {
   x: number;
@@ -901,7 +900,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
           {EDGE_TYPE_META.map((et) => (
             <button
               key={et.id}
-              onClick={() => onEdgeTypeToggle(et.id)}
+              onClick={() => onEdgeTypeToggle(et.id as EdgeType)}
               className={`px-2 py-1.5 text-xs rounded flex items-center gap-1 transition-colors ${
                 filters.edgeTypes.has(et.id)
                   ? "text-gray-100"

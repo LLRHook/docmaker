@@ -50,7 +50,7 @@ export interface SidebarHandle {
 
 const COLLAPSED_KEY = "docmaker-sidebar-collapsed";
 
-export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId, edgeTypes }, ref) {
+export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }, ref) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeNodeTypes, setActiveNodeTypes] = useState<Set<string>>(

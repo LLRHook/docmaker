@@ -1,5 +1,5 @@
 import { useSettings } from "../../contexts/SettingsContext";
-import type { GraphViewSettings, EdgeType } from "../../types/settings";
+import type { GraphViewSettings } from "../../types/settings";
 import {
   LAYOUT_LABELS,
   LAYOUT_QUALITY_LABELS,
@@ -43,12 +43,6 @@ export function GraphSettings() {
 
   const handleLargeGraphThresholdChange = (value: number) => {
     updateCategory("graphView", { largeGraphThreshold: value });
-  };
-
-  const handleEdgeTypeFilterChange = (edgeType: EdgeType, enabled: boolean) => {
-    updateCategory("graphView", {
-      edgeTypeFilters: { ...graphView.edgeTypeFilters, [edgeType]: enabled },
-    });
   };
 
   return (
