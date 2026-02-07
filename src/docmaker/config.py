@@ -41,6 +41,7 @@ class OutputConfig:
     include_source_snippets: bool = True
     max_snippet_lines: int = 50
     generate_index: bool = True
+    generate_moc: bool = True
 
 
 @dataclass
@@ -85,6 +86,7 @@ class DocmakerConfig:
             include_source_snippets=output_data.get("include_source_snippets", True),
             max_snippet_lines=output_data.get("max_snippet_lines", 50),
             generate_index=output_data.get("generate_index", True),
+            generate_moc=output_data.get("generate_moc", True),
         )
 
         return cls(
@@ -147,6 +149,7 @@ class DocmakerConfig:
                 "include_source_snippets": self.output.include_source_snippets,
                 "max_snippet_lines": self.output.max_snippet_lines,
                 "generate_index": self.output.generate_index,
+                "generate_moc": self.output.generate_moc,
             },
         }
 
