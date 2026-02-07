@@ -99,6 +99,7 @@ export interface MethodInfo {
   parameters: { name: string; type: string | null }[];
   modifiers: string[];
   line: number;
+  endLine?: number;
   docstring?: string | null;
   annotations?: AnnotationInfo[];
 }

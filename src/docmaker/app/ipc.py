@@ -452,6 +452,7 @@ class DocmakerAPI(PyloidIPC):
                             "parameters": [{"name": p.name, "type": p.type} for p in m.parameters],
                             "modifiers": m.modifiers,
                             "line": m.line_number,
+                            "endLine": m.end_line,
                             "docstring": m.docstring,
                             "annotations": [
                                 {"name": a.name, "arguments": a.arguments} for a in m.annotations
@@ -562,6 +563,68 @@ class DocmakerAPI(PyloidIPC):
             return json.dumps(defaults)
         except Exception as e:
             logger.exception("Error resetting settings")
+            return json.dumps({"error": str(e)})
+
+    @Bridge(str, int, int, result=str)
+    def read_source(self, path: str, start_line: int, end_line: int) -> str:
+        """Read source code from a file, optionally limited to a line range.
+
+        Args:
+            path: Path to the source file
+            start_line: First line to read (1-based, 0 for beginning)
+            end_line: Last line to read (inclusive, 0 for end of file)
+
+        Returns:
+            JSON string with source code lines and metadata
+        """
+        try:
+            file_path = Path(path)
+            if not file_path.exists():
+                return json.dumps({"error": f"File does not exist: {path}"})
+
+            text = file_path.read_text(encoding="utf-8", errors="replace")
+            all_lines = text.splitlines()
+
+            if start_line > 0 and end_line > 0:
+                # Convert to 0-based indexing, clamp to bounds
+                start_idx = max(0, start_line - 1)
+                end_idx = min(len(all_lines), end_line)
+                lines = all_lines[start_idx:end_idx]
+                actual_start = start_idx + 1
+            else:
+                lines = all_lines
+                actual_start = 1
+
+            # Detect language from extension
+            ext = file_path.suffix.lstrip(".")
+            lang_map = {
+                "java": "java",
+                "py": "python",
+                "ts": "typescript",
+                "tsx": "typescript",
+                "js": "javascript",
+                "jsx": "javascript",
+                "kt": "kotlin",
+                "xml": "xml",
+                "yaml": "yaml",
+                "yml": "yaml",
+                "json": "json",
+                "md": "markdown",
+            }
+            language = lang_map.get(ext, ext)
+
+            return json.dumps(
+                {
+                    "lines": lines,
+                    "startLine": actual_start,
+                    "totalLines": len(all_lines),
+                    "language": language,
+                    "path": str(file_path),
+                }
+            )
+
+        except Exception as e:
+            logger.exception("Error reading source file")
             return json.dumps({"error": str(e)})
 
     @Bridge(int, int, result=str)
