@@ -18,6 +18,8 @@ declare module "react-cytoscapejs" {
     userZoomingEnabled?: boolean;
     userPanningEnabled?: boolean;
     selectionType?: "single" | "additive";
+    textureOnViewport?: boolean;
+    hideEdgesOnViewport?: boolean;
   }
 
   const CytoscapeComponent: ComponentType<CytoscapeComponentProps>;

@@ -9,6 +9,7 @@ import type { GraphViewSettings } from "../types/settings";
 import { ANIMATION_DURATION } from "../types/settings";
 import { markStart, markEnd } from "../utils/perf";
 import { GraphMinimap } from "./GraphMinimap";
+import { useLayoutWorker } from "../hooks/useLayoutWorker";
 
 // Register fCOSE extension
 cytoscape.use(fcose);
@@ -66,71 +67,75 @@ const EDGE_STYLES: Record<string, { lineStyle: string; color: string; width: num
   contains: { lineStyle: "dotted", color: "#4b5563", width: 1 },
 };
 
-const stylesheet: StylesheetDef[] = [
-  {
-    selector: "node",
-    style: {
-      label: "data(label)",
-      "text-valign": "center",
-      "text-halign": "center",
-      "font-size": "10px",
-      color: "#e5e7eb",
-      "text-outline-color": "#1f2937",
-      "text-outline-width": 2,
-      "background-color": "data(color)",
-      shape: "data(shape)",
-      width: "data(size)",
-      height: "data(size)",
-      "border-width": 0,
+function buildStylesheet(largeGraph: boolean): StylesheetDef[] {
+  return [
+    {
+      selector: "node",
+      style: {
+        label: largeGraph ? "" : "data(label)",
+        "text-valign": "center",
+        "text-halign": "center",
+        "font-size": "10px",
+        color: "#e5e7eb",
+        "text-outline-color": "#1f2937",
+        "text-outline-width": 2,
+        "background-color": "data(color)",
+        shape: "data(shape)",
+        width: "data(size)",
+        height: "data(size)",
+        "border-width": 0,
+      },
     },
-  },
-  {
-    selector: "node:selected",
-    style: {
-      "border-width": 3,
-      "border-color": "#fbbf24",
+    {
+      selector: "node:selected",
+      style: {
+        "border-width": 3,
+        "border-color": "#fbbf24",
+      },
     },
-  },
-  {
-    selector: "node.highlighted",
-    style: {
-      "border-width": 3,
-      "border-color": "#fbbf24",
-      "background-opacity": 1,
+    {
+      selector: "node.highlighted",
+      style: {
+        "border-width": 3,
+        "border-color": "#fbbf24",
+        "background-opacity": 1,
+        // Show label on highlighted nodes even in large graph mode
+        label: "data(label)",
+      },
     },
-  },
-  {
-    selector: "node.faded",
-    style: {
-      opacity: 0.3,
+    {
+      selector: "node.faded",
+      style: {
+        opacity: 0.3,
+      },
     },
-  },
-  {
-    selector: "edge",
-    style: {
-      width: "data(width)",
-      "line-color": "data(color)",
-      "line-style": "data(lineStyle)",
-      "target-arrow-color": "data(color)",
-      "target-arrow-shape": "triangle",
-      "curve-style": "bezier",
-      opacity: 0.7,
+    {
+      selector: "edge",
+      style: {
+        width: "data(width)",
+        "line-color": "data(color)",
+        "line-style": largeGraph ? "solid" : "data(lineStyle)",
+        "target-arrow-color": "data(color)",
+        "target-arrow-shape": "triangle",
+        "curve-style": largeGraph ? "straight" : "bezier",
+        opacity: 0.7,
+      },
     },
-  },
-  {
-    selector: "edge.faded",
-    style: {
-      opacity: 0.1,
+    {
+      selector: "edge.faded",
+      style: {
+        opacity: 0.1,
+      },
     },
-  },
-  {
-    selector: "edge.highlighted",
-    style: {
-      opacity: 1,
-      width: 3,
+    {
+      selector: "edge.highlighted",
+      style: {
+        opacity: 1,
+        width: 3,
+      },
     },
-  },
-];
+  ];
+}
 
 interface TooltipState {
   x: number;
@@ -175,6 +180,10 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   // Minimap state
   const [cyInstance, setCyInstance] = useState<Core | null>(null);
   const [showMinimap, setShowMinimap] = useState(true);
+
+  // Layout worker for off-thread computation on large graphs
+  const { computeLayout: computeWorkerLayout } = useLayoutWorker();
+  const [layoutInProgress, setLayoutInProgress] = useState(false);
 
   // Close export menu on click outside
   useEffect(() => {
@@ -309,27 +318,67 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
     }
   }, [selectedNodeId]);
 
-  // Fit graph when elements change significantly
+  // Determine if graph is large enough to warrant off-thread layout
+  const nodeCount = useMemo(
+    () => elements.filter((el) => !("source" in el.data)).length,
+    [elements],
+  );
+  const isLargeGraph = nodeCount > graphSettings.largeGraphThreshold;
+
+  // Build stylesheet with large-graph optimizations (no labels, straight edges)
+  const stylesheet = useMemo(() => buildStylesheet(isLargeGraph), [isLargeGraph]);
+
+  // Run layout — off-thread via web worker for large graphs, inline otherwise
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy || elements.length === 0) return;
+    let cancelled = false;
 
-    // Run layout with animation settings
     const animationDuration = ANIMATION_DURATION[graphSettings.animationSpeed];
     const layoutName = graphSettings.defaultLayout;
-    const nodeCount = graph.nodes.length;
-    markStart("graph:layout");
-    const layout = cy.layout(
-      getLayoutOptions(layoutName, {
-        nodeCount,
-        animationDuration,
-        quality: graphSettings.layoutQuality,
-        largeGraphThreshold: graphSettings.largeGraphThreshold,
-      })
-    );
-    layout.on("layoutstop", () => markEnd("graph:layout"));
-    layout.run();
-  }, [elements, graphSettings.animationSpeed, graphSettings.defaultLayout, graphSettings.layoutQuality, graphSettings.largeGraphThreshold, graph.nodes.length]);
+    const layoutConfig: LayoutConfig = {
+      nodeCount,
+      animationDuration,
+      quality: graphSettings.layoutQuality,
+      largeGraphThreshold: graphSettings.largeGraphThreshold,
+    };
+
+    if (isLargeGraph && (layoutName === "fcose" || layoutName === "cose")) {
+      // Off-thread layout for large force-directed graphs
+      setLayoutInProgress(true);
+      markStart("graph:layout");
+
+      // Build plain element definitions for the worker
+      const workerElements = elements.map((el) => ({ data: { ...el.data } }));
+      const opts = getLayoutOptions(layoutName, layoutConfig);
+      // Disable animation in worker — we batch-apply positions
+      const workerOpts = { ...opts, animate: false, animationDuration: 0 };
+
+      computeWorkerLayout(workerElements, workerOpts as Record<string, unknown>)
+        .then(({ positions }) => {
+          if (cancelled) return;
+          cy.startBatch();
+          for (const [id, pos] of Object.entries(positions)) {
+            cy.getElementById(id).position(pos);
+          }
+          cy.endBatch();
+          cy.fit(undefined, 30);
+          markEnd("graph:layout");
+          setLayoutInProgress(false);
+        })
+        .catch(() => {
+          if (!cancelled) setLayoutInProgress(false);
+        });
+    } else {
+      // Inline layout for small graphs or non-force layouts
+      markStart("graph:layout");
+      const layout = cy.layout(getLayoutOptions(layoutName, layoutConfig));
+      layout.on("layoutstop", () => markEnd("graph:layout"));
+      layout.run();
+    }
+
+    return () => { cancelled = true; };
+  }, [elements, graphSettings.animationSpeed, graphSettings.defaultLayout, graphSettings.layoutQuality, graphSettings.largeGraphThreshold, nodeCount, isLargeGraph, computeWorkerLayout]);
 
   const handleCyInit = useCallback((cy: Core) => {
     cyRef.current = cy;
@@ -417,19 +466,38 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
     if (!cy) return;
 
     const animationDuration = ANIMATION_DURATION[graphSettings.animationSpeed];
-    const nodeCount = graph.nodes.length;
-    markStart("graph:layout");
-    const layout = cy.layout(
-      getLayoutOptions(layoutName, {
-        nodeCount,
-        animationDuration,
-        quality: graphSettings.layoutQuality,
-        largeGraphThreshold: graphSettings.largeGraphThreshold,
-      })
-    );
-    layout.on("layoutstop", () => markEnd("graph:layout"));
-    layout.run();
-  }, [graph.nodes.length, graphSettings.animationSpeed, graphSettings.layoutQuality, graphSettings.largeGraphThreshold]);
+    const layoutConfig: LayoutConfig = {
+      nodeCount,
+      animationDuration,
+      quality: graphSettings.layoutQuality,
+      largeGraphThreshold: graphSettings.largeGraphThreshold,
+    };
+
+    if (isLargeGraph && (layoutName === "fcose" || layoutName === "cose")) {
+      setLayoutInProgress(true);
+      markStart("graph:layout");
+      const workerElements = elements.map((el) => ({ data: { ...el.data } }));
+      const opts = getLayoutOptions(layoutName, layoutConfig);
+      const workerOpts = { ...opts, animate: false, animationDuration: 0 };
+      computeWorkerLayout(workerElements, workerOpts as Record<string, unknown>)
+        .then(({ positions }) => {
+          cy.startBatch();
+          for (const [id, pos] of Object.entries(positions)) {
+            cy.getElementById(id).position(pos);
+          }
+          cy.endBatch();
+          cy.fit(undefined, 30);
+          markEnd("graph:layout");
+          setLayoutInProgress(false);
+        })
+        .catch(() => setLayoutInProgress(false));
+    } else {
+      markStart("graph:layout");
+      const layout = cy.layout(getLayoutOptions(layoutName, layoutConfig));
+      layout.on("layoutstop", () => markEnd("graph:layout"));
+      layout.run();
+    }
+  }, [nodeCount, isLargeGraph, elements, graphSettings.animationSpeed, graphSettings.layoutQuality, graphSettings.largeGraphThreshold, computeWorkerLayout]);
 
   const handleFitGraph = useCallback(() => {
     const cy = cyRef.current;
@@ -667,6 +735,17 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
         </div>
       )}
 
+      {/* Layout computing indicator */}
+      {layoutInProgress && (
+        <div className="absolute top-4 right-4 z-20 bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 shadow-lg flex items-center gap-2">
+          <svg className="w-4 h-4 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="text-sm text-gray-300">Computing layout...</span>
+        </div>
+      )}
+
       {/* Minimap */}
       {showMinimap && <GraphMinimap cy={cyInstance} />}
 
@@ -680,6 +759,8 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
           wheelSensitivity={graphSettings.scrollSpeed}
           minZoom={0.1}
           maxZoom={3}
+          textureOnViewport={isLargeGraph}
+          hideEdgesOnViewport={isLargeGraph}
         />
       ) : (
         <div className="flex items-center justify-center h-full text-gray-500">
@@ -755,13 +836,14 @@ function getLayoutOptions(name: LayoutName, config: LayoutConfig): LayoutOptions
       return {
         ...baseOptions,
         name: "fcose",
-        quality: config.quality,
+        quality: isLarge ? "draft" : config.quality,
         fit: true,
         padding: 30,
         nodeSeparation: 100,
-        nodeRepulsion: () => 4500,
-        idealEdgeLength: () => 80,
-        edgeElasticity: () => 0.45,
+        // Use plain numbers (serializable for web workers) instead of functions
+        nodeRepulsion: 4500,
+        idealEdgeLength: 80,
+        edgeElasticity: 0.45,
         gravity: 0.25,
         numIter: isLarge ? 500 : 2500,
         randomize: true,
