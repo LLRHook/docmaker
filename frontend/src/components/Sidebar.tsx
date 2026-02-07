@@ -15,6 +15,7 @@ export interface FilterState {
   categories: Set<string>;
   edgeTypes: Set<string>;
   searchQuery: string;
+  edgeTypes: Set<string>;
 }
 
 const NODE_TYPES = [
@@ -91,6 +92,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
         categories: activeCategories,
         edgeTypes,
         searchQuery: "",
+        edgeTypes,
       });
     },
   }), [nodes, activeNodeTypes, activeCategories, edgeTypes, searchQuery, onFilterChange]);
@@ -119,6 +121,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
         categories: activeCategories,
         edgeTypes,
         searchQuery: query,
+        edgeTypes,
       });
     }, 200);
   }, [activeNodeTypes, activeCategories, edgeTypes, onFilterChange]);
@@ -136,6 +139,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
       categories: activeCategories,
       edgeTypes,
       searchQuery,
+      edgeTypes,
     });
   };
 
@@ -152,6 +156,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
       categories: newCategories,
       edgeTypes,
       searchQuery,
+      edgeTypes,
     });
   };
 
