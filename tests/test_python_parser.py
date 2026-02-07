@@ -402,3 +402,101 @@ def test_parser_extracts_class_fields(python_parser, sample_python_class):
     user_service = next(c for c in symbols.classes if c.name == "UserService")
     field_names = [f.name for f in user_service.fields]
     assert "default_limit" in field_names
+
+
+def test_parser_extracts_method_calls(python_parser, sample_python_class):
+    """Test that the parser extracts method calls from function bodies."""
+    source_file = SourceFile(
+        path=sample_python_class,
+        relative_path=Path("user_service.py"),
+        language=Language.PYTHON,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = python_parser.parse(source_file)
+
+    user_service = next(c for c in symbols.classes if c.name == "UserService")
+    get_user = next(m for m in user_service.methods if m.name == "get_user")
+    assert "self.repository.find_by_id" in get_user.calls
+
+    create_user = next(m for m in user_service.methods if m.name == "create_user")
+    assert "User" in create_user.calls
+    assert "self.repository.save" in create_user.calls
+
+
+def test_parser_extracts_calls_from_module_functions(python_parser):
+    """Test that the parser extracts calls from module-level functions."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write('''
+import logging
+
+logger = logging.getLogger(__name__)
+
+def process_data(items):
+    """Process a list of items."""
+    validated = validate(items)
+    results = transform(validated)
+    logger.info("done")
+    return results
+''')
+        f.flush()
+        source_file = SourceFile(
+            path=Path(f.name),
+            relative_path=Path("processor.py"),
+            language=Language.PYTHON,
+            category=FileCategory.BACKEND,
+        )
+
+    symbols = python_parser.parse(source_file)
+    process = next(f for f in symbols.functions if f.name == "process_data")
+    assert "validate" in process.calls
+    assert "transform" in process.calls
+    assert "logger.info" in process.calls
+
+
+def test_parser_calls_are_deduplicated(python_parser):
+    """Test that duplicate calls are deduplicated."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write('''
+def process():
+    validate()
+    transform()
+    validate()
+''')
+        f.flush()
+        source_file = SourceFile(
+            path=Path(f.name),
+            relative_path=Path("processor.py"),
+            language=Language.PYTHON,
+            category=FileCategory.BACKEND,
+        )
+
+    symbols = python_parser.parse(source_file)
+    process = next(f for f in symbols.functions if f.name == "process")
+    assert process.calls.count("validate") == 1
+    assert "transform" in process.calls
+
+
+def test_parser_extracts_chained_calls(python_parser):
+    """Test that the parser handles chained/attribute calls."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write('''
+class Builder:
+    def build(self):
+        result = self.config.get("key")
+        data = json.loads(raw)
+        return result
+''')
+        f.flush()
+        source_file = SourceFile(
+            path=Path(f.name),
+            relative_path=Path("builder.py"),
+            language=Language.PYTHON,
+            category=FileCategory.BACKEND,
+        )
+
+    symbols = python_parser.parse(source_file)
+    cls = symbols.classes[0]
+    build = next(m for m in cls.methods if m.name == "build")
+    assert "self.config.get" in build.calls
+    assert "json.loads" in build.calls

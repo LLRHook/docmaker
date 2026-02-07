@@ -384,6 +384,13 @@ class TypeScriptParser(BaseParser):
         if not name:
             return None
 
+        # Extract calls from the method body
+        calls = []
+        for child in node.children:
+            if child.type == "statement_block":
+                calls = self._extract_calls(child, content)
+                break
+
         return FunctionDef(
             name=name,
             file_path=file_path,
@@ -395,6 +402,7 @@ class TypeScriptParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
 
     def _extract_module_functions(
@@ -461,6 +469,13 @@ class TypeScriptParser(BaseParser):
         if not name:
             return None
 
+        # Extract calls from the function body
+        calls = []
+        for child in node.children:
+            if child.type == "statement_block":
+                calls = self._extract_calls(child, content)
+                break
+
         return FunctionDef(
             name=name,
             file_path=file_path,
@@ -472,6 +487,7 @@ class TypeScriptParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
 
     def _extract_arrow_functions(
@@ -524,6 +540,13 @@ class TypeScriptParser(BaseParser):
             elif child.type == "async":
                 modifiers.append("async")
 
+        # Extract calls from the arrow function body
+        calls = []
+        for child in node.children:
+            if child.type == "statement_block":
+                calls = self._extract_calls(child, content)
+                break
+
         return FunctionDef(
             name=name,
             file_path=file_path,
@@ -534,7 +557,50 @@ class TypeScriptParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
+
+    def _extract_calls(self, node: Node, content: str) -> list[str]:
+        """Extract function/method call targets from a syntax tree node.
+
+        Recursively walks the node to find all `call_expression` nodes and
+        extracts the callee name. Handles simple calls (func()), member calls
+        (obj.method()), and chained calls (a.b.c()).
+        """
+        calls: list[str] = []
+        self._find_calls(node, content, calls)
+        seen: set[str] = set()
+        unique: list[str] = []
+        for c in calls:
+            if c not in seen:
+                seen.add(c)
+                unique.append(c)
+        return unique
+
+    def _find_calls(self, node: Node, content: str, calls: list[str]) -> None:
+        """Recursively find call expressions in a node."""
+        if node.type == "call_expression":
+            callee = self._resolve_callee(node, content)
+            if callee:
+                calls.append(callee)
+        for child in node.children:
+            self._find_calls(child, content, calls)
+
+    def _resolve_callee(self, call_node: Node, content: str) -> str | None:
+        """Resolve the callee of a call expression.
+
+        For TypeScript call_expression nodes, the first child is the callee:
+        - identifier: simple function call
+        - member_expression: obj.method() or a.b.c()
+        """
+        for child in call_node.children:
+            if child.type == "identifier":
+                return self._get_node_text(child, content)
+            elif child.type == "member_expression":
+                return self._get_node_text(child, content)
+            elif child.type == "arguments":
+                break
+        return None
 
     def _parse_parameters(self, node: Node, content: str) -> list[Parameter]:
         """Parse function parameters."""

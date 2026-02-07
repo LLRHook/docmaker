@@ -295,6 +295,13 @@ class JavaParser(BaseParser):
         if not name:
             return None
 
+        # Extract calls from the method body
+        calls = []
+        for child in node.children:
+            if child.type == "block":
+                calls = self._extract_calls(child, content)
+                break
+
         return FunctionDef(
             name=name,
             file_path=file_path,
@@ -306,6 +313,7 @@ class JavaParser(BaseParser):
             annotations=annotations,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
 
     def _parse_constructor(self, node: Node, content: str, file_path: Path) -> FunctionDef | None:
@@ -330,6 +338,13 @@ class JavaParser(BaseParser):
         if not name:
             return None
 
+        # Extract calls from the constructor body
+        calls = []
+        for child in node.children:
+            if child.type == "constructor_body" or child.type == "block":
+                calls = self._extract_calls(child, content)
+                break
+
         return FunctionDef(
             name=name,
             file_path=file_path,
@@ -341,7 +356,74 @@ class JavaParser(BaseParser):
             annotations=annotations,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
+
+    def _extract_calls(self, node: Node, content: str) -> list[str]:
+        """Extract method call targets from a syntax tree node.
+
+        Recursively walks the node to find all `method_invocation` nodes and
+        extracts the callee name. Handles simple calls (method()), qualified
+        calls (obj.method()), and chained calls (a.b.method()).
+        """
+        calls: list[str] = []
+        self._find_calls(node, content, calls)
+        seen: set[str] = set()
+        unique: list[str] = []
+        for c in calls:
+            if c not in seen:
+                seen.add(c)
+                unique.append(c)
+        return unique
+
+    def _find_calls(self, node: Node, content: str, calls: list[str]) -> None:
+        """Recursively find method invocations in a node."""
+        if node.type == "method_invocation":
+            callee = self._resolve_callee(node, content)
+            if callee:
+                calls.append(callee)
+        for child in node.children:
+            self._find_calls(child, content, calls)
+
+    def _resolve_callee(self, call_node: Node, content: str) -> str | None:
+        """Resolve the callee of a method invocation.
+
+        For Java method_invocation nodes, the structure is:
+        - Simple: identifier (method name) + argument_list
+        - Qualified: object.identifier + argument_list
+
+        Returns the dotted name (e.g. "repository.findById" or "toString").
+        """
+        # Collect the object and method name parts
+        object_part = None
+        method_name = None
+
+        for child in call_node.children:
+            if child.type == "identifier":
+                if method_name is None:
+                    method_name = self._get_node_text(child, content)
+                else:
+                    # If we already have a method name, this is the actual method
+                    # and the previous was the object
+                    object_part = method_name
+                    method_name = self._get_node_text(child, content)
+            elif child.type in ("field_access", "member_access"):
+                object_part = self._get_node_text(child, content)
+            elif child.type == ".":
+                continue
+            elif child.type == "argument_list":
+                continue
+            elif child.type == "this":
+                object_part = "this"
+            elif child.type == "super":
+                object_part = "super"
+            elif child.type in ("method_invocation", "object_creation_expression"):
+                # Chained call — the object is another call, use its text
+                object_part = self._get_node_text(child, content)
+
+        if object_part and method_name:
+            return f"{object_part}.{method_name}"
+        return method_name
 
     def _parse_parameters(self, node: Node, content: str) -> list[Parameter]:
         """Parse method parameters."""

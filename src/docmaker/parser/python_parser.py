@@ -411,6 +411,13 @@ class PythonParser(BaseParser):
             if decorator.name in ("staticmethod", "classmethod", "property", "abstractmethod"):
                 modifiers.append(decorator.name)
 
+        # Extract calls from the function body
+        calls = []
+        for child in node.children:
+            if child.type == "block":
+                calls = self._extract_calls(child, content)
+                break
+
         return FunctionDef(
             name=name,
             file_path=file_path,
@@ -422,7 +429,49 @@ class PythonParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
+
+    def _extract_calls(self, node: Node, content: str) -> list[str]:
+        """Extract function/method call targets from a syntax tree node.
+
+        Recursively walks the node to find all `call` expressions and extracts
+        the callee name. Handles simple calls (func()), attribute calls
+        (obj.method()), and chained calls (a.b.c()).
+        """
+        calls: list[str] = []
+        self._find_calls(node, content, calls)
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        unique: list[str] = []
+        for c in calls:
+            if c not in seen:
+                seen.add(c)
+                unique.append(c)
+        return unique
+
+    def _find_calls(self, node: Node, content: str, calls: list[str]) -> None:
+        """Recursively find call expressions in a node."""
+        if node.type == "call":
+            callee = self._resolve_callee(node, content)
+            if callee:
+                calls.append(callee)
+        for child in node.children:
+            self._find_calls(child, content, calls)
+
+    def _resolve_callee(self, call_node: Node, content: str) -> str | None:
+        """Resolve the callee of a call expression to a name string.
+
+        Returns the function/method name for the call. For attribute access
+        (e.g. self.method()), returns the dotted name. Skips calls where the
+        callee cannot be statically determined (e.g. computed expressions).
+        """
+        for child in call_node.children:
+            if child.type == "identifier":
+                return self._get_node_text(child, content)
+            elif child.type == "attribute":
+                return self._get_node_text(child, content)
+        return None
 
     def _parse_parameters(self, node: Node, content: str) -> list[Parameter]:
         """Parse function parameters."""

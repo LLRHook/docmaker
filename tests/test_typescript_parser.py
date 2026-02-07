@@ -539,3 +539,102 @@ export function Greeting({ name }: Props): JSX.Element {
 
     function_names = [f.name for f in symbols.functions]
     assert "Greeting" in function_names
+
+
+def test_parser_extracts_method_calls(typescript_parser, sample_typescript_class):
+    """Test that the parser extracts method calls from method bodies."""
+    source_file = SourceFile(
+        path=sample_typescript_class,
+        relative_path=Path("user.service.ts"),
+        language=Language.TYPESCRIPT,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = typescript_parser.parse(source_file)
+
+    user_service = next(c for c in symbols.classes if c.name == "UserService")
+    get_users = next(m for m in user_service.methods if m.name == "getUsers")
+    # Should find this.http.get(...).toPromise()
+    assert any("this.http.get" in c for c in get_users.calls)
+
+    get_user = next(m for m in user_service.methods if m.name == "getUser")
+    assert any("this.http.get" in c for c in get_user.calls)
+
+    create_user = next(m for m in user_service.methods if m.name == "createUser")
+    assert any("this.http.post" in c for c in create_user.calls)
+
+
+def test_parser_extracts_calls_from_module_functions(typescript_parser):
+    """Test that the parser extracts calls from module-level functions."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ts", delete=False) as f:
+        f.write('''
+import { validate } from "./utils";
+
+export function processData(items: string[]): string[] {
+    const validated = validate(items);
+    const results = transform(validated);
+    console.log("done");
+    return results;
+}
+''')
+        f.flush()
+        source_file = SourceFile(
+            path=Path(f.name),
+            relative_path=Path("processor.ts"),
+            language=Language.TYPESCRIPT,
+            category=FileCategory.BACKEND,
+        )
+
+    symbols = typescript_parser.parse(source_file)
+    process = next(f for f in symbols.functions if f.name == "processData")
+    assert "validate" in process.calls
+    assert "transform" in process.calls
+    assert "console.log" in process.calls
+
+
+def test_parser_extracts_calls_from_arrow_functions(typescript_parser):
+    """Test that the parser extracts calls from arrow functions."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ts", delete=False) as f:
+        f.write('''
+const fetchUsers = async (): Promise<User[]> => {
+    const response = await fetch("/api/users");
+    const data = await response.json();
+    return data;
+};
+''')
+        f.flush()
+        source_file = SourceFile(
+            path=Path(f.name),
+            relative_path=Path("api.ts"),
+            language=Language.TYPESCRIPT,
+            category=FileCategory.BACKEND,
+        )
+
+    symbols = typescript_parser.parse(source_file)
+    fetch_users = next(f for f in symbols.functions if f.name == "fetchUsers")
+    assert "fetch" in fetch_users.calls
+    assert "response.json" in fetch_users.calls
+
+
+def test_parser_calls_are_deduplicated(typescript_parser):
+    """Test that duplicate calls are deduplicated."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ts", delete=False) as f:
+        f.write('''
+function process(): void {
+    validate();
+    transform();
+    validate();
+}
+''')
+        f.flush()
+        source_file = SourceFile(
+            path=Path(f.name),
+            relative_path=Path("processor.ts"),
+            language=Language.TYPESCRIPT,
+            category=FileCategory.BACKEND,
+        )
+
+    symbols = typescript_parser.parse(source_file)
+    process = next(f for f in symbols.functions if f.name == "process")
+    assert process.calls.count("validate") == 1
+    assert "transform" in process.calls

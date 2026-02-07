@@ -175,3 +175,82 @@ def test_parser_extracts_endpoint_paths(java_parser, sample_controller):
     paths = {ep.path for ep in symbols.endpoints}
     assert "/api/users/{id}" in paths
     assert "/api/users" in paths
+
+
+def test_parser_extracts_method_calls(java_parser, sample_controller):
+    """Test that the parser extracts method calls from method bodies."""
+    source_file = SourceFile(
+        path=sample_controller,
+        relative_path=Path("UserController.java"),
+        language=Language.JAVA,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = java_parser.parse(source_file)
+
+    cls = symbols.classes[0]
+    get_user = next(m for m in cls.methods if m.name == "getUser")
+    assert "userService.findById" in get_user.calls
+
+    create_user = next(m for m in cls.methods if m.name == "createUser")
+    assert "userService.save" in create_user.calls
+
+    delete_user = next(m for m in cls.methods if m.name == "deleteUser")
+    assert "userService.delete" in delete_user.calls
+
+
+def test_parser_extracts_constructor_calls(java_parser):
+    """Test that the parser extracts calls from constructors."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".java", delete=False) as f:
+        f.write("""
+package com.example;
+
+public class Service {
+    public Service() {
+        init();
+        logger.info("created");
+    }
+}
+""")
+        f.flush()
+        source_file = SourceFile(
+            path=Path(f.name),
+            relative_path=Path("Service.java"),
+            language=Language.JAVA,
+            category=FileCategory.BACKEND,
+        )
+
+    symbols = java_parser.parse(source_file)
+    cls = symbols.classes[0]
+    constructor = next(m for m in cls.methods if m.name == "Service")
+    assert "init" in constructor.calls
+    assert "logger.info" in constructor.calls
+
+
+def test_parser_calls_are_deduplicated(java_parser):
+    """Test that duplicate calls are deduplicated."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".java", delete=False) as f:
+        f.write("""
+package com.example;
+
+public class Processor {
+    public void process() {
+        validate();
+        transform();
+        validate();
+    }
+}
+""")
+        f.flush()
+        source_file = SourceFile(
+            path=Path(f.name),
+            relative_path=Path("Processor.java"),
+            language=Language.JAVA,
+            category=FileCategory.BACKEND,
+        )
+
+    symbols = java_parser.parse(source_file)
+    cls = symbols.classes[0]
+    process = next(m for m in cls.methods if m.name == "process")
+    assert process.calls.count("validate") == 1
+    assert "transform" in process.calls
