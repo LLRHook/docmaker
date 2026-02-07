@@ -7,7 +7,6 @@ import tree_sitter_javascript as tsjavascript
 from tree_sitter import Language, Node, Parser
 
 from docmaker.models import (
-    Annotation,
     ClassDef,
     FieldDef,
     FileSymbols,
