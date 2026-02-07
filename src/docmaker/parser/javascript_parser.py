@@ -351,14 +351,14 @@ class JavaScriptParser(BaseParser):
         functions = []
 
         for child in root.children:
-            if child.type == "function_declaration":
+            if child.type in ("function_declaration", "generator_function_declaration"):
                 func = self._parse_function(child, content, file_path)
                 if func:
                     functions.append(func)
             elif child.type == "export_statement":
                 export_jsdoc = self._extract_jsdoc(child, content)
                 for subchild in child.children:
-                    if subchild.type == "function_declaration":
+                    if subchild.type in ("function_declaration", "generator_function_declaration"):
                         func = self._parse_function(subchild, content, file_path)
                         if func:
                             func.modifiers.append("export")
