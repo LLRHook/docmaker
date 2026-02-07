@@ -50,6 +50,7 @@ class KotlinParser(BaseParser):
         symbols.package = self._extract_package(tree.root_node, content)
         symbols.imports = self._extract_imports(tree.root_node, content)
         symbols.classes = self._extract_classes(tree.root_node, content, file.path)
+        symbols.functions = self._extract_top_level_functions(tree.root_node, content, file.path)
         symbols.endpoints = self._extract_endpoints_from_classes(symbols.classes, symbols.package)
 
         return symbols
@@ -278,6 +279,20 @@ class KotlinParser(BaseParser):
                                 return True
         return False
 
+    # ── Top-level function extraction ──────────────────────────────────
+
+    def _extract_top_level_functions(
+        self, root: Node, content: str, file_path: Path
+    ) -> list[FunctionDef]:
+        """Extract top-level function declarations."""
+        functions = []
+        for child in root.children:
+            if child.type == "function_declaration":
+                func = self._parse_method(child, content, file_path)
+                if func:
+                    functions.append(func)
+        return functions
+
     # ── Class extraction ───────────────────────────────────────────────
 
     def _extract_classes(self, root: Node, content: str, file_path: Path) -> list[ClassDef]:
@@ -376,9 +391,12 @@ class KotlinParser(BaseParser):
         # Check for data modifier
         is_data = "data" in modifiers
 
-        prev_sibling = node.prev_sibling
-        if prev_sibling and prev_sibling.type in ("multiline_comment", "line_comment"):
-            docstring = self._clean_docstring(self._get_node_text(prev_sibling, content))
+        # Walk back past annotation nodes to find preceding docstring
+        prev = node.prev_sibling
+        while prev and prev.type in ("annotated_expression", "annotation"):
+            prev = prev.prev_sibling
+        if prev and prev.type in ("multiline_comment", "block_comment", "line_comment"):
+            docstring = self._clean_docstring(self._get_node_text(prev, content))
 
         if not name:
             return None
@@ -432,9 +450,12 @@ class KotlinParser(BaseParser):
             elif child.type == "delegation_specifiers":
                 superclass, interfaces = self._parse_delegation_specifiers(child, content)
 
-        prev_sibling = node.prev_sibling
-        if prev_sibling and prev_sibling.type in ("multiline_comment", "line_comment"):
-            docstring = self._clean_docstring(self._get_node_text(prev_sibling, content))
+        # Walk back past annotation nodes to find preceding docstring
+        prev = node.prev_sibling
+        while prev and prev.type in ("annotated_expression", "annotation"):
+            prev = prev.prev_sibling
+        if prev and prev.type in ("multiline_comment", "block_comment", "line_comment"):
+            docstring = self._clean_docstring(self._get_node_text(prev, content))
 
         if not name:
             return None
@@ -492,6 +513,10 @@ class KotlinParser(BaseParser):
                 method = self._parse_method(child, content, file_path)
                 if method:
                     methods.append(method)
+            elif child.type == "companion_object":
+                for sub in child.children:
+                    if sub.type == "class_body":
+                        methods.extend(self._extract_methods(sub, content, file_path))
         return methods
 
     def _parse_method(self, node: Node, content: str, file_path: Path) -> FunctionDef | None:
@@ -507,19 +532,23 @@ class KotlinParser(BaseParser):
         if is_suspend and "suspend" not in modifiers:
             modifiers.insert(0, "suspend")
 
+        past_params = False
         for child in node.children:
             if child.type == "identifier":
                 name = self._get_node_text(child, content)
-            elif child.type in ("user_type", "nullable_type"):
-                # Return type appears after ":"
-                if return_type is None:
-                    return_type = self._get_node_text(child, content)
             elif child.type == "function_value_parameters":
                 parameters = self._parse_parameters(child, content)
+                past_params = True
+            elif child.type in ("user_type", "nullable_type") and past_params:
+                if return_type is None:
+                    return_type = self._get_node_text(child, content)
 
-        prev_sibling = node.prev_sibling
-        if prev_sibling and prev_sibling.type in ("multiline_comment", "line_comment"):
-            docstring = self._clean_docstring(self._get_node_text(prev_sibling, content))
+        # Walk back past annotation nodes to find preceding docstring
+        prev = node.prev_sibling
+        while prev and prev.type in ("annotated_expression", "annotation"):
+            prev = prev.prev_sibling
+        if prev and prev.type in ("multiline_comment", "block_comment", "line_comment"):
+            docstring = self._clean_docstring(self._get_node_text(prev, content))
 
         if not name:
             return None
@@ -593,6 +622,10 @@ class KotlinParser(BaseParser):
                 field = self._parse_field(child, content)
                 if field:
                     fields.append(field)
+            elif child.type == "companion_object":
+                for sub in child.children:
+                    if sub.type == "class_body":
+                        fields.extend(self._extract_fields(sub, content))
         return fields
 
     def _parse_field(self, node: Node, content: str) -> FieldDef | None:
@@ -653,7 +686,7 @@ class KotlinParser(BaseParser):
                 modifiers.append("val")
             elif child.type == "var":
                 modifiers.append("var")
-            elif child.type == "identifier":
+            elif child.type == "identifier" and name is None:
                 name = self._get_node_text(child, content)
             elif child.type in ("user_type", "nullable_type"):
                 field_type = self._get_node_text(child, content)
