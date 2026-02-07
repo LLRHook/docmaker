@@ -161,6 +161,9 @@ class MarkdownGenerator:
             iface_links = [self.linker.get_wikilink(i, file_symbols) for i in cls.interfaces]
             lines.append(f"**Implements:** {', '.join(iface_links)}\n")
 
+        if cls.summary:
+            lines.append(f"**Summary:** {cls.summary}\n")
+
         if cls.docstring:
             lines.append(f"> {cls.docstring}\n")
 
@@ -214,6 +217,9 @@ class MarkdownGenerator:
             ret_link = self.linker.get_wikilink(method.return_type, file_symbols)
             lines.append(f"**Returns:** {ret_link}\n")
 
+        if method.summary:
+            lines.append(f"**Summary:** {method.summary}\n")
+
         if method.docstring:
             lines.append(f"> {method.docstring}\n")
 
@@ -256,6 +262,9 @@ class MarkdownGenerator:
         if func.return_type:
             ret_link = self.linker.get_wikilink(func.return_type, file_symbols)
             lines.append(f"**Returns:** {ret_link}\n")
+
+        if func.summary:
+            lines.append(f"**Summary:** {func.summary}\n")
 
         if func.docstring:
             lines.append(f"> {func.docstring}\n")
