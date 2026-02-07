@@ -9,6 +9,8 @@ import type { GraphViewSettings } from "../types/settings";
 import { ANIMATION_DURATION } from "../types/settings";
 import { markStart, markEnd } from "../utils/perf";
 import { GraphMinimap } from "./GraphMinimap";
+import { GraphSearchBar } from "./GraphSearchBar";
+import { matchNodeToQuery, type SearchMatchResult } from "../utils/graphSearch";
 
 // Register fCOSE extension
 cytoscape.use(fcose);
@@ -35,6 +37,7 @@ export interface GraphViewHandle {
   fitGraph: () => void;
   getConnectedNodeIds: (nodeId: string) => { incoming: string[]; outgoing: string[] };
   centerOnNode: (nodeId: string) => void;
+  focusGraphSearch: () => void;
 }
 
 export type LayoutName = "fcose" | "cose" | "circle" | "grid";
@@ -129,6 +132,27 @@ const stylesheet: StylesheetDef[] = [
       width: 3,
     },
   },
+  {
+    selector: "node.search-match",
+    style: {
+      "border-width": 3,
+      "border-color": "#22d3ee",
+      "background-opacity": 1,
+      "z-index": 10,
+    },
+  },
+  {
+    selector: "node.search-dimmed",
+    style: {
+      opacity: 0.15,
+    },
+  },
+  {
+    selector: "edge.search-dimmed",
+    style: {
+      opacity: 0.05,
+    },
+  },
 ];
 
 interface TooltipState {
@@ -166,6 +190,11 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   const [cyInstance, setCyInstance] = useState<Core | null>(null);
   const [showMinimap, setShowMinimap] = useState(true);
 
+  // Graph search state
+  const [graphSearchQuery, setGraphSearchQuery] = useState("");
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0);
+  const graphSearchInputRef = useRef<HTMLInputElement>(null);
+
   // Close export menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -199,6 +228,9 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
       if (node.length) {
         cy.animate({ center: { eles: node }, duration: 200 });
       }
+    },
+    focusGraphSearch() {
+      graphSearchInputRef.current?.focus();
     },
   }), []);
 
@@ -294,6 +326,93 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
       }
     }
   }, [selectedNodeId]);
+
+  // Graph search: compute matches when query changes
+  const searchMatches = useMemo(() => {
+    if (!graphSearchQuery.trim()) return [];
+    return graph.nodes
+      .map((node) => matchNodeToQuery(node, graphSearchQuery))
+      .filter((r): r is SearchMatchResult => r !== null);
+  }, [graphSearchQuery, graph.nodes]);
+
+  // Graph search: apply highlight/dim classes
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+
+    cy.elements().removeClass("search-match search-dimmed");
+
+    if (searchMatches.length === 0) return;
+
+    const matchIds = new Set(searchMatches.map((m) => m.nodeId));
+
+    cy.nodes().forEach((node) => {
+      if (matchIds.has(node.id())) {
+        node.addClass("search-match");
+      } else {
+        node.addClass("search-dimmed");
+      }
+    });
+    cy.edges().forEach((edge) => {
+      const srcMatch = matchIds.has(edge.source().id());
+      const tgtMatch = matchIds.has(edge.target().id());
+      if (!srcMatch && !tgtMatch) {
+        edge.addClass("search-dimmed");
+      }
+    });
+
+    // Center viewport on matched nodes
+    const matchedCyNodes = cy.nodes().filter((n) => matchIds.has(n.id()));
+    if (matchedCyNodes.length > 0) {
+      cy.animate({ fit: { eles: matchedCyNodes, padding: 50 }, duration: 300 });
+    }
+  }, [searchMatches]);
+
+  // Graph search: center on active match when navigating
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || searchMatches.length === 0) return;
+
+    const activeMatch = searchMatches[activeMatchIndex];
+    if (activeMatch) {
+      const node = cy.getElementById(activeMatch.nodeId);
+      if (node.length) {
+        cy.animate({ center: { eles: node }, duration: 200 });
+      }
+    }
+  }, [activeMatchIndex, searchMatches]);
+
+  const handleGraphSearchChange = useCallback((query: string) => {
+    setGraphSearchQuery(query);
+    setActiveMatchIndex(0);
+  }, []);
+
+  const handleGraphSearchNext = useCallback(() => {
+    if (searchMatches.length === 0) return;
+    setActiveMatchIndex((prev) => (prev + 1) % searchMatches.length);
+  }, [searchMatches.length]);
+
+  const handleGraphSearchPrev = useCallback(() => {
+    if (searchMatches.length === 0) return;
+    setActiveMatchIndex((prev) => (prev - 1 + searchMatches.length) % searchMatches.length);
+  }, [searchMatches.length]);
+
+  const handleGraphSearchClear = useCallback(() => {
+    setGraphSearchQuery("");
+    setActiveMatchIndex(0);
+    const cy = cyRef.current;
+    if (cy) {
+      cy.elements().removeClass("search-match search-dimmed");
+    }
+  }, []);
+
+  const handleGraphSearchSelectActive = useCallback(() => {
+    if (searchMatches.length === 0) return;
+    const activeMatch = searchMatches[activeMatchIndex];
+    if (activeMatch) {
+      onNodeSelect(activeMatch.nodeId);
+    }
+  }, [searchMatches, activeMatchIndex, onNodeSelect]);
 
   // Fit graph when elements change significantly
   useEffect(() => {
@@ -573,6 +692,19 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
           </svg>
         </button>
+
+        {/* Graph search */}
+        <GraphSearchBar
+          ref={graphSearchInputRef}
+          query={graphSearchQuery}
+          matchCount={searchMatches.length}
+          activeIndex={activeMatchIndex}
+          onChange={handleGraphSearchChange}
+          onNext={handleGraphSearchNext}
+          onPrev={handleGraphSearchPrev}
+          onClear={handleGraphSearchClear}
+          onSelectActive={handleGraphSearchSelectActive}
+        />
       </div>
 
       {/* Legend */}
