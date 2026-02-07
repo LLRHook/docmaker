@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from docmaker.parser.js_parser import JavaScriptParser
+from docmaker.parser.javascript_parser import JavaScriptParser
 
 from docmaker.models import FileCategory, Language, SourceFile
 
