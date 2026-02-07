@@ -1,5 +1,38 @@
 @import 'tailwindcss';
 
+/* Theme color variables - dark is default */
+:root {
+  --c-bg: #111827;
+  --c-surface: #1f2937;
+  --c-element: #374151;
+  --c-hover: #4b5563;
+  --c-text: #f3f4f6;
+  --c-text-sub: #d1d5db;
+  --c-text-dim: #9ca3af;
+  --c-text-faint: #6b7280;
+  --c-line: #374151;
+  --c-line-soft: #4b5563;
+  --c-scrollbar-track: #1f2937;
+  --c-scrollbar-thumb: #4b5563;
+  --c-scrollbar-hover: #6b7280;
+}
+
+html.light {
+  --c-bg: #ffffff;
+  --c-surface: #f3f4f6;
+  --c-element: #e5e7eb;
+  --c-hover: #d1d5db;
+  --c-text: #111827;
+  --c-text-sub: #374151;
+  --c-text-dim: #6b7280;
+  --c-text-faint: #9ca3af;
+  --c-line: #d1d5db;
+  --c-line-soft: #e5e7eb;
+  --c-scrollbar-track: #f3f4f6;
+  --c-scrollbar-thumb: #d1d5db;
+  --c-scrollbar-hover: #9ca3af;
+}
+
 @theme {
   --color-node-class: #3b82f6;
   --color-node-interface: #a855f7;
@@ -10,6 +43,18 @@
   --color-cat-frontend: #22c55e;
   --color-cat-config: #f59e0b;
   --color-cat-test: #6b7280;
+
+  /* Theme-aware colors registered as Tailwind utilities */
+  --color-c-bg: var(--c-bg);
+  --color-c-surface: var(--c-surface);
+  --color-c-element: var(--c-element);
+  --color-c-hover: var(--c-hover);
+  --color-c-text: var(--c-text);
+  --color-c-text-sub: var(--c-text-sub);
+  --color-c-text-dim: var(--c-text-dim);
+  --color-c-text-faint: var(--c-text-faint);
+  --color-c-line: var(--c-line);
+  --color-c-line-soft: var(--c-line-soft);
 }
 
 /*
@@ -59,16 +104,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: var(--c-scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: var(--c-scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: var(--c-scrollbar-hover);
 }
 
 /* Cytoscape container */

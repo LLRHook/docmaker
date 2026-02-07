@@ -31,7 +31,7 @@ const CATEGORIES = [
   { id: "frontend", label: "Frontend", color: "bg-green-500" },
   { id: "config", label: "Config", color: "bg-amber-500" },
   { id: "test", label: "Test", color: "bg-gray-500" },
-  { id: "unknown", label: "Unknown", color: "bg-gray-600" },
+  { id: "unknown", label: "Unknown", color: "bg-c-hover" },
 ];
 
 export interface SidebarHandle {
@@ -190,22 +190,22 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
   }, [nodes, activeNodeTypes, activeCategories, searchQuery]);
 
   return (
-    <div className="w-full bg-gray-800 border-r border-gray-700 flex flex-col h-full">
+    <div className="w-full bg-c-surface border-r border-c-line flex flex-col h-full">
       {/* Search */}
-      <div className="p-3 border-b border-gray-700">
+      <div className="p-3 border-b border-c-line">
         <input
           ref={searchInputRef}
           type="text"
           placeholder="Search nodes..."
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 placeholder-gray-400 focus:outline-hidden focus:border-blue-500"
+          className="w-full px-3 py-2 bg-c-element border border-c-line-soft rounded-sm text-sm text-c-text placeholder-gray-400 focus:outline-hidden focus:border-blue-500"
         />
       </div>
 
       {/* Filters */}
-      <div className="p-3 border-b border-gray-700">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">Node Types</h3>
+      <div className="p-3 border-b border-c-line">
+        <h3 className="text-xs font-semibold text-c-text-dim uppercase mb-2">Node Types</h3>
         <div className="flex flex-wrap gap-1">
           {NODE_TYPES.map((type) => (
             <button
@@ -213,8 +213,8 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
               onClick={() => toggleNodeType(type.id)}
               className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
                 activeNodeTypes.has(type.id)
-                  ? "bg-gray-600 text-gray-100"
-                  : "bg-gray-700 text-gray-500"
+                  ? "bg-c-hover text-c-text"
+                  : "bg-c-element text-c-text-faint"
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${type.color}`} />
@@ -224,8 +224,8 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
         </div>
       </div>
 
-      <div className="p-3 border-b border-gray-700">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase mb-2">Categories</h3>
+      <div className="p-3 border-b border-c-line">
+        <h3 className="text-xs font-semibold text-c-text-dim uppercase mb-2">Categories</h3>
         <div className="flex flex-wrap gap-1">
           {CATEGORIES.map((cat) => (
             <button
@@ -233,8 +233,8 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
               onClick={() => toggleCategory(cat.id)}
               className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
                 activeCategories.has(cat.id)
-                  ? "bg-gray-600 text-gray-100"
-                  : "bg-gray-700 text-gray-500"
+                  ? "bg-c-hover text-c-text"
+                  : "bg-c-element text-c-text-faint"
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${cat.color}`} />
@@ -247,13 +247,13 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
       {/* Node List */}
       <div className="flex-1 overflow-y-auto">
         {NODE_TYPES.filter((type) => nodesByType[type.id]?.length > 0).map((type) => (
-          <div key={type.id} className="border-b border-gray-700">
+          <div key={type.id} className="border-b border-c-line">
             <button
               onClick={() => toggleGroupCollapse(type.id)}
-              className="w-full px-3 py-2 bg-gray-750 flex items-center gap-2 hover:bg-gray-700/50 transition-colors"
+              className="w-full px-3 py-2 bg-c-surface flex items-center gap-2 hover:bg-c-element/50 transition-colors"
             >
               <svg
-                className={`w-3 h-3 text-gray-400 transition-transform ${collapsedGroups.has(type.id) ? "" : "rotate-90"}`}
+                className={`w-3 h-3 text-c-text-dim transition-transform ${collapsedGroups.has(type.id) ? "" : "rotate-90"}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -261,7 +261,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
               <span className={`w-2 h-2 rounded-full ${type.color}`} />
-              <span className="text-xs font-semibold text-gray-300">
+              <span className="text-xs font-semibold text-c-text-sub">
                 {type.label} ({nodesByType[type.id].length})
               </span>
             </button>
@@ -271,8 +271,8 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
                   <button
                     key={node.id}
                     onClick={() => onNodeSelect(node.id)}
-                    className={`w-full px-3 py-1.5 text-left text-sm truncate hover:bg-gray-700 ${
-                      selectedNodeId === node.id ? "bg-gray-700 text-blue-400" : "text-gray-300"
+                    className={`w-full px-3 py-1.5 text-left text-sm truncate hover:bg-c-element ${
+                      selectedNodeId === node.id ? "bg-c-element text-blue-400" : "text-c-text-sub"
                     }`}
                     title={node.metadata.fqn || node.label}
                   >
@@ -286,7 +286,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
       </div>
 
       {/* Stats */}
-      <div className="p-3 border-t border-gray-700 text-xs text-gray-500">
+      <div className="p-3 border-t border-c-line text-xs text-c-text-faint">
         Showing {filteredNodes.length} of {nodes.length} nodes
       </div>
     </div>

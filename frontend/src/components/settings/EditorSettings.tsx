@@ -29,11 +29,11 @@ export function EditorSettings() {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-medium text-gray-100">Editor Integration</h3>
+      <h3 className="text-lg font-medium text-c-text">Editor Integration</h3>
 
       {/* Preferred Editor */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-c-text-sub mb-2">
           Preferred Editor
         </label>
         <select
@@ -41,7 +41,7 @@ export function EditorSettings() {
           onChange={(e) =>
             handleEditorChange(e.target.value as EditorSettingsType["preferredEditor"])
           }
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+          className="w-full px-3 py-2 bg-c-element border border-c-line-soft rounded-sm text-sm text-c-text focus:outline-none focus:border-blue-500"
         >
           {editorOptions.map((opt) => (
             <option key={opt} value={opt}>
@@ -49,7 +49,7 @@ export function EditorSettings() {
             </option>
           ))}
         </select>
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-c-text-faint mt-2">
           The editor to use when opening files from the graph view
         </p>
       </div>
@@ -57,7 +57,7 @@ export function EditorSettings() {
       {/* Custom Editor Command */}
       {editor.preferredEditor === "custom" && (
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label className="block text-sm font-medium text-c-text-sub mb-2">
             Custom Command
           </label>
           <input
@@ -65,30 +65,30 @@ export function EditorSettings() {
             value={editor.customEditorCommand}
             onChange={(e) => handleCustomCommandChange(e.target.value)}
             placeholder="code --goto {file}:{line}"
-            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-sm text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            className="w-full px-3 py-2 bg-c-element border border-c-line-soft rounded-sm text-sm text-c-text placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
-          <p className="text-xs text-gray-500 mt-2">
-            Use <code className="bg-gray-700 px-1 rounded">{"{file}"}</code> and{" "}
-            <code className="bg-gray-700 px-1 rounded">{"{line}"}</code> as placeholders
+          <p className="text-xs text-c-text-faint mt-2">
+            Use <code className="bg-c-element px-1 rounded">{"{file}"}</code> and{" "}
+            <code className="bg-c-element px-1 rounded">{"{line}"}</code> as placeholders
           </p>
         </div>
       )}
 
       {/* Always Ask */}
-      <div className="pt-4 border-t border-gray-700">
+      <div className="pt-4 border-t border-c-line">
         <div className="flex items-start gap-3">
           <input
             type="checkbox"
             id="alwaysAsk"
             checked={editor.alwaysAsk}
             onChange={(e) => handleAlwaysAskChange(e.target.checked)}
-            className="mt-1 w-4 h-4 bg-gray-700 border-gray-600 rounded text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+            className="mt-1 w-4 h-4 bg-c-element border-c-line-soft rounded text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
           />
           <div>
-            <label htmlFor="alwaysAsk" className="text-sm text-gray-300 font-medium">
+            <label htmlFor="alwaysAsk" className="text-sm text-c-text-sub font-medium">
               Always ask before opening
             </label>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-c-text-faint mt-1">
               Shows an editor selection dialog each time you open a file, instead of using
               the preferred editor automatically
             </p>

@@ -42,12 +42,12 @@ export const KeyboardShortcutHelp = memo(function KeyboardShortcutHelp({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+        className="bg-c-surface border border-c-line rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-100">Keyboard Shortcuts</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
+          <h2 className="text-lg font-semibold text-c-text">Keyboard Shortcuts</h2>
+          <button onClick={onClose} className="text-c-text-dim hover:text-c-text">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -56,8 +56,8 @@ export const KeyboardShortcutHelp = memo(function KeyboardShortcutHelp({
         <div className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-2">
           {SHORTCUTS.map(({ key, description }) => (
             <div key={key} className="contents">
-              <span className="text-sm text-gray-300">{description}</span>
-              <kbd className="px-2 py-0.5 bg-gray-700 border border-gray-600 rounded text-xs text-gray-200 font-mono whitespace-nowrap">
+              <span className="text-sm text-c-text-sub">{description}</span>
+              <kbd className="px-2 py-0.5 bg-c-element border border-c-line-soft rounded text-xs text-c-text font-mono whitespace-nowrap">
                 {key}
               </kbd>
             </div>
