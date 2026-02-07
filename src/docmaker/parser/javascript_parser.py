@@ -106,9 +106,7 @@ class JavaScriptParser(BaseParser):
                                         else:
                                             alias = self._get_node_text(spec_child, content)
                                 if name:
-                                    full_module = (
-                                        f"{module_path}.{name}" if module_path else name
-                                    )
+                                    full_module = f"{module_path}.{name}" if module_path else name
                                     imports.append(
                                         ImportDef(
                                             module=full_module,
@@ -221,9 +219,7 @@ class JavaScriptParser(BaseParser):
 
     # ── Classes ──────────────────────────────────────────────────────────
 
-    def _extract_classes(
-        self, root: Node, content: str, file_path: Path
-    ) -> list[ClassDef]:
+    def _extract_classes(self, root: Node, content: str, file_path: Path) -> list[ClassDef]:
         """Extract all class definitions."""
         classes = []
         self._find_classes(root, content, file_path, classes)
@@ -253,9 +249,7 @@ class JavaScriptParser(BaseParser):
                                 class_def.docstring = export_jsdoc
                             classes.append(class_def)
 
-    def _parse_class(
-        self, node: Node, content: str, file_path: Path
-    ) -> ClassDef | None:
+    def _parse_class(self, node: Node, content: str, file_path: Path) -> ClassDef | None:
         """Parse a class declaration node."""
         name = None
         superclass = None
@@ -313,9 +307,7 @@ class JavaScriptParser(BaseParser):
 
         return methods
 
-    def _parse_method(
-        self, node: Node, content: str, file_path: Path
-    ) -> FunctionDef | None:
+    def _parse_method(self, node: Node, content: str, file_path: Path) -> FunctionDef | None:
         """Parse a method definition."""
         name = None
         parameters = []
@@ -374,9 +366,7 @@ class JavaScriptParser(BaseParser):
                                 func.docstring = export_jsdoc
                             functions.append(func)
                     elif subchild.type == "lexical_declaration":
-                        funcs = self._extract_arrow_functions(
-                            subchild, content, file_path
-                        )
+                        funcs = self._extract_arrow_functions(subchild, content, file_path)
                         for f in funcs:
                             f.modifiers.append("export")
                         functions.extend(funcs)
@@ -386,9 +376,7 @@ class JavaScriptParser(BaseParser):
 
         return functions
 
-    def _parse_function(
-        self, node: Node, content: str, file_path: Path
-    ) -> FunctionDef | None:
+    def _parse_function(self, node: Node, content: str, file_path: Path) -> FunctionDef | None:
         """Parse a function declaration."""
         name = None
         parameters = []
@@ -436,9 +424,7 @@ class JavaScriptParser(BaseParser):
                         arrow_func = subchild
 
                 if name and arrow_func:
-                    func = self._parse_arrow_function(
-                        arrow_func, name, content, file_path
-                    )
+                    func = self._parse_arrow_function(arrow_func, name, content, file_path)
                     if func:
                         functions.append(func)
 
@@ -481,9 +467,7 @@ class JavaScriptParser(BaseParser):
 
         for child in node.children:
             if child.type == "identifier":
-                parameters.append(
-                    Parameter(name=self._get_node_text(child, content))
-                )
+                parameters.append(Parameter(name=self._get_node_text(child, content)))
             elif child.type == "assignment_pattern":
                 param = self._parse_default_parameter(child, content)
                 if param:
