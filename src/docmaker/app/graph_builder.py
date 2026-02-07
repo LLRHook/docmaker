@@ -224,9 +224,7 @@ class GraphBuilder:
                 for callee in method.calls:
                     target_id = self._resolve_class_id(callee, file_symbols)
                     if target_id:
-                        graph.add_edge(
-                            GraphEdge(source=class_id, target=target_id, type="calls")
-                        )
+                        graph.add_edge(GraphEdge(source=class_id, target=target_id, type="calls"))
 
         # Add import edges
         for imp in file_symbols.imports:

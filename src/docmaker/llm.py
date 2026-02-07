@@ -180,12 +180,7 @@ class LMStudioProvider(LLMProvider):
                 )
                 response.raise_for_status()
                 result = response.json()
-                return (
-                    result.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content", "")
-                    .strip()
-                )
+                return result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
         except Exception as e:
             logger.warning(f"LLM generation failed: {e}")
             return None
@@ -230,12 +225,7 @@ class OpenAIProvider(LLMProvider):
                 )
                 response.raise_for_status()
                 result = response.json()
-                return (
-                    result.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content", "")
-                    .strip()
-                )
+                return result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
         except Exception as e:
             logger.warning(f"LLM generation failed: {e}")
             return None
@@ -341,9 +331,7 @@ class Summarizer:
             superclass=cls.superclass or "None",
             interfaces=", ".join(cls.interfaces) if cls.interfaces else "None",
             annotations=(
-                ", ".join(f"@{a.name}" for a in cls.annotations)
-                if cls.annotations
-                else "None"
+                ", ".join(f"@{a.name}" for a in cls.annotations) if cls.annotations else "None"
             ),
             methods=", ".join(m.name for m in cls.methods) if cls.methods else "None",
             source_code=cls.source_code[:3000] if cls.source_code else "N/A",
@@ -356,9 +344,9 @@ class Summarizer:
             class_name=class_name,
             method_name=method.name,
             language=language,
-            parameters=", ".join(
-                f"{p.name}: {p.type or 'Any'}" for p in method.parameters
-            ) if method.parameters else "None",
+            parameters=", ".join(f"{p.name}: {p.type or 'Any'}" for p in method.parameters)
+            if method.parameters
+            else "None",
             return_type=method.return_type or "None",
             annotations=(
                 ", ".join(f"@{a.name}" for a in method.annotations)
