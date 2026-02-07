@@ -10,7 +10,14 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:headed": "playwright test --headed",
+    "test:perf": "playwright test --grep @perf",
+    "test:bundle": "tsc -b && vite build && node scripts/check-bundle.js",
+    "qa": "npm run lint && npm run test:run && npm run test:bundle && npm run test:e2e",
+    "qa:perf": "npm run test:perf",
+    "test:e2e:fullstack": "playwright test --project=fullstack"
   },
   "dependencies": {
     "cytoscape": "^3.30.4",
@@ -22,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
