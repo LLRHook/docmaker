@@ -8,6 +8,7 @@ import type {
   ClassDetails,
   EndpointDetails,
   CodeGraph,
+  SourceSnippet,
 } from "../types/graph";
 import { createLogger } from "../utils/logger";
 import { markStart, markEnd } from "../utils/perf";
@@ -330,6 +331,28 @@ export function usePyloid() {
     }
   }, []);
 
+  const getSourceSnippet = useCallback(async (path: string, startLine: number, endLine: number): Promise<SourceSnippet> => {
+    logger.debug("getSourceSnippet called:", path, startLine, endLine);
+    try {
+      const result = await ipc.DocmakerAPI.get_source_snippet(path, startLine, endLine);
+      const parsed = JSON.parse(result);
+      if (parsed.error) {
+        logger.error("getSourceSnippet error:", parsed.error);
+      }
+      return parsed;
+    } catch (error) {
+      logger.error("getSourceSnippet failed:", error);
+      return {
+        source: "",
+        startLine: 0,
+        endLine: 0,
+        totalLines: 0,
+        path: "",
+        error: String(error),
+      };
+    }
+  }, []);
+
   const clearCaches = useCallback(() => {
     classDetailsCache.current.clear();
     endpointDetailsCache.current.clear();
@@ -346,6 +369,7 @@ export function usePyloid() {
     getProjectInfo,
     getClassDetails,
     getEndpointDetails,
+    getSourceSnippet,
     getSettings,
     saveSettings,
     resetSettings,

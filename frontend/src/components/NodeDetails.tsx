@@ -1,6 +1,7 @@
 import { memo, useEffect, useState, useCallback, useMemo } from "react";
 import type { GraphNode, ClassDetails, EndpointDetails, FieldInfo, MethodInfo, CategorizedParameter, ParameterCategory, AnnotationInfo } from "../types/graph";
 import { usePyloid } from "../hooks/usePyloid";
+import { SourcePreview } from "./SourcePreview";
 
 function getDefaultForType(javaType: string): unknown {
   const normalized = javaType.trim();
@@ -374,6 +375,13 @@ export const NodeDetails = memo(function NodeDetails({
                             </span>
                             <span className="text-gray-200">{field.name}</span>
                           </div>
+                          {field.line > 0 && classDetails.path && (
+                            <SourcePreview
+                              filePath={classDetails.path}
+                              startLine={field.line}
+                              endLine={field.line}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -406,6 +414,13 @@ export const NodeDetails = memo(function NodeDetails({
                                 </span>
                               ))}
                             </div>
+                          )}
+                          {method.line > 0 && method.endLine && method.endLine > 0 && classDetails.path && (
+                            <SourcePreview
+                              filePath={classDetails.path}
+                              startLine={method.line}
+                              endLine={method.endLine}
+                            />
                           )}
                         </div>
                       ))}

@@ -99,6 +99,7 @@ export interface MethodInfo {
   parameters: { name: string; type: string | null }[];
   modifiers: string[];
   line: number;
+  endLine?: number;
   docstring?: string | null;
   annotations?: AnnotationInfo[];
 }
@@ -133,6 +134,15 @@ export interface CategorizedParameter {
   type: string | null;
   description: string | null;
   category: ParameterCategory;
+}
+
+export interface SourceSnippet {
+  source: string;
+  startLine: number;
+  endLine: number;
+  totalLines: number;
+  path: string;
+  error?: string;
 }
 
 export interface EndpointDetails {
