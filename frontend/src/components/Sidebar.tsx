@@ -1,4 +1,4 @@
-import { memo, useState, useMemo, useRef, useCallback } from "react";
+import { memo, useState, useMemo, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import type { GraphNode } from "../types/graph";
 import { markStart, markEnd } from "../utils/perf";
 
@@ -31,9 +31,17 @@ const CATEGORIES = [
   { id: "unknown", label: "Unknown", color: "bg-gray-600" },
 ];
 
+export interface SidebarHandle {
+  focusSearch: () => void;
+  getFilteredNodeIds: () => string[];
+  toggleNodeType: (typeId: string) => void;
+  clearSearch: () => void;
+}
+
 const COLLAPSED_KEY = "docmaker-sidebar-collapsed";
 
-export const Sidebar = memo(function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }: SidebarProps) {
+export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sidebar({ nodes, onNodeSelect, onFilterChange, selectedNodeId }, ref) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeNodeTypes, setActiveNodeTypes] = useState<Set<string>>(
     new Set(NODE_TYPES.map((t) => t.id))
@@ -48,6 +56,41 @@ export const Sidebar = memo(function Sidebar({ nodes, onNodeSelect, onFilterChan
     } catch { /* ignore */ }
     return new Set();
   });
+
+  // Expose imperative handle for keyboard navigation
+  useImperativeHandle(ref, () => ({
+    focusSearch() {
+      searchInputRef.current?.focus();
+    },
+    getFilteredNodeIds() {
+      return nodes
+        .filter((node) => {
+          if (!activeNodeTypes.has(node.type)) return false;
+          const category = node.metadata.category || "unknown";
+          if (!activeCategories.has(category)) return false;
+          if (searchQuery) {
+            const lowerQuery = searchQuery.toLowerCase();
+            return (
+              node.label.toLowerCase().includes(lowerQuery) ||
+              (node.metadata.fqn?.toLowerCase().includes(lowerQuery) ?? false)
+            );
+          }
+          return true;
+        })
+        .map((n) => n.id);
+    },
+    toggleNodeType(typeId: string) {
+      toggleNodeType(typeId);
+    },
+    clearSearch() {
+      setSearchQuery("");
+      onFilterChange({
+        nodeTypes: activeNodeTypes,
+        categories: activeCategories,
+        searchQuery: "",
+      });
+    },
+  }), [nodes, activeNodeTypes, activeCategories, searchQuery, onFilterChange]);
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -140,6 +183,7 @@ export const Sidebar = memo(function Sidebar({ nodes, onNodeSelect, onFilterChan
       {/* Search */}
       <div className="p-3 border-b border-gray-700">
         <input
+          ref={searchInputRef}
           type="text"
           placeholder="Search nodes..."
           value={searchQuery}
@@ -236,4 +280,4 @@ export const Sidebar = memo(function Sidebar({ nodes, onNodeSelect, onFilterChan
       </div>
     </div>
   );
-});
+}));

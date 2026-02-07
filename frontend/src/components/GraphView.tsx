@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect, useCallback, useMemo } from "react";
+import { memo, useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from "react";
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
@@ -8,6 +8,7 @@ import { useSettings } from "../contexts/SettingsContext";
 import type { GraphViewSettings } from "../types/settings";
 import { ANIMATION_DURATION } from "../types/settings";
 import { markStart, markEnd } from "../utils/perf";
+import { GraphMinimap } from "./GraphMinimap";
 
 // Register fCOSE extension
 cytoscape.use(fcose);
@@ -28,6 +29,12 @@ interface GraphViewProps {
   selectedNodeId: string | null;
   onNodeSelect: (nodeId: string | null) => void;
   onNodeDoubleClick: (node: GraphNode) => void;
+}
+
+export interface GraphViewHandle {
+  fitGraph: () => void;
+  getConnectedNodeIds: (nodeId: string) => { incoming: string[]; outgoing: string[] };
+  centerOnNode: (nodeId: string) => void;
 }
 
 export type LayoutName = "fcose" | "cose" | "circle" | "grid";
@@ -124,17 +131,76 @@ const stylesheet: StylesheetDef[] = [
   },
 ];
 
-export const GraphView = memo(function GraphView({
+interface TooltipState {
+  x: number;
+  y: number;
+  label: string;
+  nodeType: string;
+  methodCount?: number;
+  fieldCount?: number;
+  method?: string;
+  handler?: string;
+}
+
+export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(function GraphView({
   graph,
   filters,
   selectedNodeId,
   onNodeSelect,
   onNodeDoubleClick,
-}: GraphViewProps) {
+}, ref) {
   const cyRef = useRef<Core | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { settings } = useSettings();
   const graphSettings = settings.graphView;
+
+  // Tooltip state
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Export menu state
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Minimap state
+  const [cyInstance, setCyInstance] = useState<Core | null>(null);
+  const [showMinimap, setShowMinimap] = useState(true);
+
+  // Close export menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Imperative handle for keyboard navigation
+  useImperativeHandle(ref, () => ({
+    fitGraph() {
+      const cy = cyRef.current;
+      if (cy) cy.fit(undefined, 50);
+    },
+    getConnectedNodeIds(nodeId: string) {
+      const cy = cyRef.current;
+      if (!cy) return { incoming: [], outgoing: [] };
+      const node = cy.getElementById(nodeId);
+      if (!node.length) return { incoming: [], outgoing: [] };
+      const incoming = node.incomers("node").map((n) => n.id());
+      const outgoing = node.outgoers("node").map((n) => n.id());
+      return { incoming, outgoing };
+    },
+    centerOnNode(nodeId: string) {
+      const cy = cyRef.current;
+      if (!cy) return;
+      const node = cy.getElementById(nodeId);
+      if (node.length) {
+        cy.animate({ center: { eles: node }, duration: 200 });
+      }
+    },
+  }), []);
 
   // Calculate node degrees (connection count) for sizing
   const nodeDegrees = useMemo(() => {
@@ -253,6 +319,7 @@ export const GraphView = memo(function GraphView({
 
   const handleCyInit = useCallback((cy: Core) => {
     cyRef.current = cy;
+    setCyInstance(cy);
 
     // Node click handler
     cy.on("tap", "node", (event: EventObject) => {
@@ -284,7 +351,52 @@ export const GraphView = memo(function GraphView({
         onNodeSelect(null);
       }
     });
+
+    // Tooltip: mouseover node
+    cy.on("mouseover", "node", (event: EventObject) => {
+      if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+      const target = event.target;
+      tooltipTimeoutRef.current = setTimeout(() => {
+        const renderedPos = target.renderedPosition();
+        const data = target.data();
+        setTooltip({
+          x: renderedPos.x,
+          y: renderedPos.y - (target.renderedHeight() / 2) - 8,
+          label: data.label,
+          nodeType: data.nodeType,
+          methodCount: data.methodCount,
+          fieldCount: data.fieldCount,
+          method: data.method,
+          handler: data.handler,
+        });
+      }, 300);
+    });
+
+    // Tooltip: mouseout node
+    cy.on("mouseout", "node", () => {
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+        tooltipTimeoutRef.current = null;
+      }
+      setTooltip(null);
+    });
+
+    // Tooltip: hide on viewport change or tap
+    cy.on("viewport tap", () => {
+      setTooltip(null);
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+        tooltipTimeoutRef.current = null;
+      }
+    });
   }, [onNodeSelect, onNodeDoubleClick]);
+
+  // Cleanup tooltip timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    };
+  }, []);
 
   const handleLayout = useCallback((layoutName: LayoutName) => {
     const cy = cyRef.current;
@@ -322,6 +434,46 @@ export const GraphView = memo(function GraphView({
     if (!cy) return;
     cy.zoom(cy.zoom() / 1.2);
   }, []);
+
+  const handleExportPNG = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const dataUri = cy.png({ bg: "#111827", full: true, scale: 2 });
+    const link = document.createElement("a");
+    link.href = dataUri;
+    link.download = "graph.png";
+    link.click();
+    setShowExportMenu(false);
+  }, []);
+
+  const handleExportSVG = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const svgStr = (cy as unknown as { svg(opts: Record<string, unknown>): string }).svg({ full: true, bg: "#111827" });
+    const blob = new Blob([svgStr], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "graph.svg";
+    link.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  }, []);
+
+  // Build tooltip metrics string
+  const tooltipMetrics = useMemo(() => {
+    if (!tooltip) return null;
+    const parts: string[] = [];
+    if (tooltip.nodeType === "class" || tooltip.nodeType === "interface") {
+      if (tooltip.methodCount !== undefined) parts.push(`${tooltip.methodCount} methods`);
+      if (tooltip.fieldCount !== undefined) parts.push(`${tooltip.fieldCount} fields`);
+    }
+    if (tooltip.nodeType === "endpoint") {
+      if (tooltip.method) parts.push(tooltip.method);
+      if (tooltip.handler) parts.push(tooltip.handler);
+    }
+    return parts.length > 0 ? parts.join(" \u00b7 ") : null;
+  }, [tooltip]);
 
   return (
     <div ref={containerRef} className="flex-1 relative bg-gray-900">
@@ -373,13 +525,54 @@ export const GraphView = memo(function GraphView({
           <button
             onClick={handleFitGraph}
             className="px-3 py-2 text-gray-300 hover:bg-gray-700 rounded-r-lg border-l border-gray-700"
-            title="Fit to screen"
+            title="Fit to screen (f)"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
           </button>
         </div>
+
+        {/* Export button */}
+        <div className="relative" ref={exportMenuRef}>
+          <button
+            onClick={() => setShowExportMenu(!showExportMenu)}
+            className="bg-gray-800 rounded-lg shadow-lg px-3 py-2 text-gray-300 hover:bg-gray-700 flex items-center gap-1.5"
+            title="Export graph"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span className="text-sm">Export</span>
+          </button>
+          {showExportMenu && (
+            <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[120px]">
+              <button
+                onClick={handleExportPNG}
+                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 rounded-t-lg"
+              >
+                PNG
+              </button>
+              <button
+                onClick={handleExportSVG}
+                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 rounded-b-lg border-t border-gray-700"
+              >
+                SVG
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Minimap toggle */}
+        <button
+          onClick={() => setShowMinimap(!showMinimap)}
+          className={`bg-gray-800 rounded-lg shadow-lg px-3 py-2 text-sm hover:bg-gray-700 ${showMinimap ? "text-blue-400" : "text-gray-300"}`}
+          title="Toggle minimap"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+          </svg>
+        </button>
       </div>
 
       {/* Legend */}
@@ -413,6 +606,33 @@ export const GraphView = memo(function GraphView({
         </div>
       </div>
 
+      {/* Tooltip */}
+      {tooltip && (
+        <div
+          className="absolute z-20 pointer-events-none bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 shadow-xl text-xs max-w-[220px]"
+          style={{
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <div className="flex items-center gap-1.5 mb-1">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: NODE_COLORS[tooltip.nodeType] || "#6b7280" }}
+            />
+            <span className="text-gray-400 capitalize">{tooltip.nodeType}</span>
+          </div>
+          <div className="text-gray-100 font-medium truncate">{tooltip.label}</div>
+          {tooltipMetrics && (
+            <div className="text-gray-400 mt-0.5">{tooltipMetrics}</div>
+          )}
+        </div>
+      )}
+
+      {/* Minimap */}
+      {showMinimap && <GraphMinimap cy={cyInstance} />}
+
       {/* Graph */}
       {elements.length > 0 ? (
         <CytoscapeComponent
@@ -437,7 +657,7 @@ export const GraphView = memo(function GraphView({
       )}
     </div>
   );
-});
+}));
 
 function getNodeSize(
   node: GraphNode,
