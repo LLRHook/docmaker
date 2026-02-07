@@ -3,10 +3,10 @@ import { renderHook, act } from "@testing-library/react";
 import { useDropZone } from "../../hooks/useDropZone";
 
 describe("useDropZone", () => {
-  let onDrop: ReturnType<typeof vi.fn>;
+  let onDrop: (path: string) => void;
 
   beforeEach(() => {
-    onDrop = vi.fn();
+    onDrop = vi.fn() as unknown as (path: string) => void;
   });
 
   afterEach(() => {
@@ -99,7 +99,7 @@ describe("useDropZone", () => {
   });
 
   it("falls back to entry.fullPath when File.path not available", () => {
-    const { result } = renderHook(() => useDropZone({ onDrop }));
+    renderHook(() => useDropZone({ onDrop }));
 
     act(() => {
       const file = new File([""], "project", { type: "" });
