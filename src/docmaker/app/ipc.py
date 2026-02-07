@@ -452,6 +452,7 @@ class DocmakerAPI(PyloidIPC):
                             "parameters": [{"name": p.name, "type": p.type} for p in m.parameters],
                             "modifiers": m.modifiers,
                             "line": m.line_number,
+                            "endLine": m.end_line,
                             "docstring": m.docstring,
                             "annotations": [
                                 {"name": a.name, "arguments": a.arguments} for a in m.annotations
@@ -588,6 +589,49 @@ class DocmakerAPI(PyloidIPC):
                 return json.dumps({"error": "Window not available"})
         except Exception as e:
             logger.exception("Error resizing window")
+            return json.dumps({"error": str(e)})
+
+    @Bridge(str, int, int, result=str)
+    def get_source_snippet(self, path: str, start_line: int, end_line: int) -> str:
+        """Read source code lines from a file.
+
+        Args:
+            path: Path to the source file
+            start_line: First line to read (1-indexed)
+            end_line: Last line to read (1-indexed, inclusive)
+
+        Returns:
+            JSON string with source lines and metadata
+        """
+        try:
+            file_path = Path(path)
+            if not file_path.exists():
+                return json.dumps({"error": f"File does not exist: {path}"})
+
+            lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            total_lines = len(lines)
+
+            # Clamp to valid range
+            start = max(1, start_line)
+            end = min(total_lines, end_line)
+
+            if start > end:
+                return json.dumps({"error": f"Invalid line range: {start}-{end}"})
+
+            snippet_lines = lines[start - 1 : end]
+
+            return json.dumps(
+                {
+                    "lines": snippet_lines,
+                    "startLine": start,
+                    "endLine": end,
+                    "totalLines": total_lines,
+                    "path": path,
+                }
+            )
+
+        except Exception as e:
+            logger.exception("Error reading source snippet")
             return json.dumps({"error": str(e)})
 
     @Bridge(result=str)

@@ -99,8 +99,18 @@ export interface MethodInfo {
   parameters: { name: string; type: string | null }[];
   modifiers: string[];
   line: number;
+  endLine?: number;
   docstring?: string | null;
   annotations?: AnnotationInfo[];
+}
+
+export interface SourceSnippet {
+  lines: string[];
+  startLine: number;
+  endLine: number;
+  totalLines: number;
+  path: string;
+  error?: string;
 }
 
 export interface FieldInfo {
