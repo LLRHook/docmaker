@@ -171,6 +171,7 @@ class GoParser(BaseParser):
                 interfaces = self._extract_embedded_types(child, content)
             elif child.type == "interface_type":
                 is_interface = True
+                interfaces = self._extract_embedded_interfaces(child, content)
 
         if not name:
             return None
@@ -239,6 +240,16 @@ class GoParser(BaseParser):
                             for c in field_node.children:
                                 if c.type in ("type_identifier", "qualified_type", "pointer_type"):
                                     embedded.append(self._get_node_text(c, content))
+        return embedded
+
+    def _extract_embedded_interfaces(self, iface_node: Node, content: str) -> list[str]:
+        """Extract embedded interface names from an interface type."""
+        embedded = []
+        for child in iface_node.children:
+            if child.type == "type_elem":
+                for sub in child.children:
+                    if sub.type in ("type_identifier", "qualified_type"):
+                        embedded.append(self._get_node_text(sub, content))
         return embedded
 
     def _extract_interface_methods(
