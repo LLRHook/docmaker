@@ -411,6 +411,14 @@ class PythonParser(BaseParser):
             if decorator.name in ("staticmethod", "classmethod", "property", "abstractmethod"):
                 modifiers.append(decorator.name)
 
+        body = None
+        for child in node.children:
+            if child.type == "block":
+                body = child
+                break
+
+        calls = self._extract_constructor_calls(body, content) if body else []
+
         return FunctionDef(
             name=name,
             file_path=file_path,
@@ -422,7 +430,38 @@ class PythonParser(BaseParser):
             annotations=decorators,
             modifiers=modifiers,
             source_code=self._get_node_text(node, content),
+            calls=calls,
         )
+
+    def _extract_constructor_calls(self, node: Node, content: str) -> list[str]:
+        """Extract constructor instantiation calls (ClassName()) from a function body.
+
+        Uses the convention that class names start with an uppercase letter.
+        """
+        calls: list[str] = []
+        self._find_constructor_calls(node, content, calls)
+        return calls
+
+    def _find_constructor_calls(self, node: Node, content: str, calls: list[str]) -> None:
+        """Recursively find call expressions that look like constructor calls."""
+        if node.type == "call":
+            func_node = node.children[0] if node.children else None
+            if func_node:
+                if func_node.type == "identifier":
+                    name = self._get_node_text(func_node, content)
+                    if name and name[0].isupper():
+                        if name not in calls:
+                            calls.append(name)
+                elif func_node.type == "attribute":
+                    # e.g., module.ClassName()
+                    text = self._get_node_text(func_node, content)
+                    parts = text.rsplit(".", 1)
+                    if len(parts) == 2 and parts[1] and parts[1][0].isupper():
+                        if text not in calls:
+                            calls.append(text)
+
+        for child in node.children:
+            self._find_constructor_calls(child, content, calls)
 
     def _parse_parameters(self, node: Node, content: str) -> list[Parameter]:
         """Parse function parameters."""

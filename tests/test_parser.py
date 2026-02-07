@@ -175,3 +175,67 @@ def test_parser_extracts_endpoint_paths(java_parser, sample_controller):
     paths = {ep.path for ep in symbols.endpoints}
     assert "/api/users/{id}" in paths
     assert "/api/users" in paths
+
+
+@pytest.fixture
+def sample_java_with_constructors():
+    """Create a sample Java file with constructor instantiation calls."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".java", delete=False) as f:
+        f.write("""
+package com.example.service;
+
+import com.example.model.User;
+import com.example.model.Address;
+import java.util.ArrayList;
+
+public class UserService {
+
+    public User createUser(String name) {
+        Address address = new Address();
+        ArrayList<String> tags = new ArrayList<>();
+        return new User(name, address);
+    }
+
+    public UserService() {
+        ArrayList<User> users = new ArrayList<>();
+    }
+}
+""")
+        f.flush()
+        yield Path(f.name)
+
+
+def test_parser_extracts_constructor_calls(java_parser, sample_java_with_constructors):
+    """Test that the parser extracts constructor instantiation calls."""
+    source_file = SourceFile(
+        path=sample_java_with_constructors,
+        relative_path=Path("UserService.java"),
+        language=Language.JAVA,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = java_parser.parse(source_file)
+
+    cls = symbols.classes[0]
+    create_user = next(m for m in cls.methods if m.name == "createUser")
+    assert "Address" in create_user.calls
+    assert "ArrayList" in create_user.calls
+    assert "User" in create_user.calls
+
+
+def test_parser_extracts_constructor_calls_in_constructor(
+    java_parser, sample_java_with_constructors
+):
+    """Test that constructor calls are extracted from constructor bodies."""
+    source_file = SourceFile(
+        path=sample_java_with_constructors,
+        relative_path=Path("UserService.java"),
+        language=Language.JAVA,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = java_parser.parse(source_file)
+
+    cls = symbols.classes[0]
+    constructor = next(m for m in cls.methods if m.name == "UserService")
+    assert "ArrayList" in constructor.calls

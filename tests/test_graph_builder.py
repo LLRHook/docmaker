@@ -184,6 +184,71 @@ def test_graph_node_metadata(sample_symbol_table: SymbolTable):
     assert controller_node.metadata["methodCount"] == 2
 
 
+def test_graph_builder_creates_calls_edges():
+    """Test that the graph builder creates calls edges from constructor instantiations."""
+    symbol_table = SymbolTable()
+
+    service_file = SourceFile(
+        path=Path("/test/OrderService.java"),
+        relative_path=Path("src/main/java/com/example/OrderService.java"),
+        language=Language.JAVA,
+        category=FileCategory.BACKEND,
+    )
+
+    target_file = SourceFile(
+        path=Path("/test/OrderValidator.java"),
+        relative_path=Path("src/main/java/com/example/OrderValidator.java"),
+        language=Language.JAVA,
+        category=FileCategory.BACKEND,
+    )
+
+    service_class = ClassDef(
+        name="OrderService",
+        file_path=Path("/test/OrderService.java"),
+        line_number=5,
+        end_line=20,
+        methods=[
+            FunctionDef(
+                name="processOrder",
+                file_path=Path("/test/OrderService.java"),
+                line_number=10,
+                end_line=15,
+                calls=["OrderValidator"],
+            ),
+        ],
+    )
+
+    validator_class = ClassDef(
+        name="OrderValidator",
+        file_path=Path("/test/OrderValidator.java"),
+        line_number=5,
+        end_line=15,
+    )
+
+    service_symbols = FileSymbols(
+        file=service_file,
+        package="com.example",
+        classes=[service_class],
+    )
+
+    validator_symbols = FileSymbols(
+        file=target_file,
+        package="com.example",
+        classes=[validator_class],
+    )
+
+    symbol_table.add_file_symbols(service_symbols)
+    symbol_table.add_file_symbols(validator_symbols)
+
+    builder = GraphBuilder(symbol_table)
+    graph = builder.build()
+
+    calls_edges = [e for e in graph.edges if e.type == "calls"]
+    assert len(calls_edges) == 1
+    assert calls_edges[0].source == "class:com.example.OrderService"
+    assert calls_edges[0].target == "class:com.example.OrderValidator"
+
+
 def test_empty_symbol_table():
     """Test that empty symbol table produces empty graph."""
     symbol_table = SymbolTable()

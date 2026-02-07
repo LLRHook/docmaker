@@ -402,3 +402,56 @@ def test_parser_extracts_class_fields(python_parser, sample_python_class):
     user_service = next(c for c in symbols.classes if c.name == "UserService")
     field_names = [f.name for f in user_service.fields]
     assert "default_limit" in field_names
+
+
+@pytest.fixture
+def sample_python_with_constructors():
+    """Create a sample Python file with constructor instantiation calls."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write('''from models import User, Address
+
+class UserService:
+    def create_user(self, name: str):
+        address = Address("123 Main St")
+        user = User(name=name, address=address)
+        return user
+
+    def get_config(self):
+        config = dict()
+        return config
+''')
+        f.flush()
+        yield Path(f.name)
+
+
+def test_parser_extracts_constructor_calls(python_parser, sample_python_with_constructors):
+    """Test that the parser extracts constructor instantiation calls."""
+    source_file = SourceFile(
+        path=sample_python_with_constructors,
+        relative_path=Path("user_service.py"),
+        language=Language.PYTHON,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = python_parser.parse(source_file)
+
+    user_service = next(c for c in symbols.classes if c.name == "UserService")
+    create_user = next(m for m in user_service.methods if m.name == "create_user")
+    assert "Address" in create_user.calls
+    assert "User" in create_user.calls
+
+
+def test_parser_ignores_lowercase_calls(python_parser, sample_python_with_constructors):
+    """Test that lowercase function calls are not treated as constructors."""
+    source_file = SourceFile(
+        path=sample_python_with_constructors,
+        relative_path=Path("user_service.py"),
+        language=Language.PYTHON,
+        category=FileCategory.BACKEND,
+    )
+
+    symbols = python_parser.parse(source_file)
+
+    user_service = next(c for c in symbols.classes if c.name == "UserService")
+    get_config = next(m for m in user_service.methods if m.name == "get_config")
+    assert "dict" not in get_config.calls
