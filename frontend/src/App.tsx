@@ -46,6 +46,8 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [detailsPanelCollapsed, setDetailsPanelCollapsed] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const graphRef = useRef<GraphViewHandle>(null);
@@ -352,8 +354,76 @@ export function App() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Drag-and-drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragOver(false);
+
+    const items = e.dataTransfer.items;
+    if (items && items.length > 0) {
+      const item = items[0];
+      // webkitGetAsEntry gives us directory info in supported browsers
+      const entry = item.webkitGetAsEntry?.();
+      if (entry?.isDirectory) {
+        // In Pyloid/desktop context, the path comes from the file's path property
+        const file = e.dataTransfer.files[0];
+        if (file && (file as File & { path?: string }).path) {
+          await handleLoadProject((file as File & { path?: string }).path!);
+          return;
+        }
+      }
+      // Fallback: use the first file's path (Electron/Pyloid expose .path on File objects)
+      const file = e.dataTransfer.files[0];
+      if (file && (file as File & { path?: string }).path) {
+        await handleLoadProject((file as File & { path?: string }).path!);
+      }
+    }
+  }, [handleLoadProject]);
+
   return (
-    <div className="h-screen flex flex-col bg-gray-900 text-gray-100">
+    <div
+      className="h-screen flex flex-col bg-gray-900 text-gray-100 relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drop zone overlay */}
+      {isDragOver && (
+        <div className="absolute inset-0 z-[100] bg-blue-600/20 border-2 border-dashed border-blue-500 flex items-center justify-center pointer-events-none">
+          <div className="bg-gray-800 rounded-lg px-8 py-6 shadow-xl text-center">
+            <svg className="w-12 h-12 mx-auto mb-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <p className="text-lg font-medium text-gray-200">Drop folder to open project</p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <header className="h-12 bg-gray-800 border-b border-gray-700 flex items-center px-4 gap-4">
         <h1 className="font-semibold text-lg">Docmaker</h1>
