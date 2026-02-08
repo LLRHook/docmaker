@@ -55,12 +55,24 @@ export interface LayoutSettings {
   detailsPanelWidth: number;
 }
 
+export type LLMProvider = "ollama" | "lmstudio" | "openai" | "anthropic";
+
+export interface LLMSettings {
+  enabled: boolean;
+  provider: LLMProvider;
+  model: string;
+  baseUrl: string;
+  apiKey: string;
+  timeout: number;
+}
+
 export interface AppSettings {
   graphView: GraphViewSettings;
   appearance: AppearanceSettings;
   editor: EditorSettings;
   general: GeneralSettings;
   layout: LayoutSettings;
+  llm: LLMSettings;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -103,6 +115,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
     windowHeight: 720,
     sidebarWidth: 288,
     detailsPanelWidth: 320,
+  },
+  llm: {
+    enabled: true,
+    provider: "ollama",
+    model: "llama3.2",
+    baseUrl: "http://localhost:11434",
+    apiKey: "",
+    timeout: 30,
   },
 };
 
@@ -179,4 +199,11 @@ export const EDGE_TYPE_COLORS: Record<keyof EdgeTypeFilters, string> = {
   imports: "#6b7280",
   calls: "#f59e0b",
   contains: "#4b5563",
+};
+
+export const LLM_PROVIDER_LABELS: Record<LLMProvider, string> = {
+  ollama: "Ollama (Local)",
+  lmstudio: "LM Studio (Local)",
+  openai: "OpenAI (Cloud)",
+  anthropic: "Anthropic (Cloud)",
 };
