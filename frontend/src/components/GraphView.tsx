@@ -226,7 +226,6 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
 
   // Graph search state (highlights without removing nodes)
   const [graphSearchQuery, setGraphSearchQuery] = useState("");
-  const [graphSearchMatchIds, setGraphSearchMatchIds] = useState<string[]>([]);
   const [graphSearchIndex, setGraphSearchIndex] = useState(0);
   const graphSearchInputRef = useRef<HTMLInputElement>(null);
 
@@ -366,6 +365,28 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
     return result;
   }, [graph, filters, graphSettings.nodeSizing, graphSettings.enablePackageClustering, nodeDegrees]);
 
+  // Derive search match IDs from query and elements
+  const graphSearchMatchIds = useMemo(() => {
+    if (!graphSearchQuery) return [];
+    const query = graphSearchQuery.toLowerCase();
+    return elements
+      .filter((el) => {
+        if ("source" in el.data) return false; // skip edges
+        const data = el.data as Record<string, unknown>;
+        const label = ((data.label as string) || "").toLowerCase();
+        const fqn = ((data.fqn as string) || "").toLowerCase();
+        const modifiers = (data.modifiers || []) as string[];
+        const annotations = (data.annotations || []) as { name: string }[];
+        return (
+          label.includes(query) ||
+          fqn.includes(query) ||
+          modifiers.some((m: string) => m.toLowerCase().includes(query)) ||
+          annotations.some((a: { name: string }) => a.name.toLowerCase().includes(query))
+        );
+      })
+      .map((el) => el.data.id as string);
+  }, [graphSearchQuery, elements]);
+
   // Handle node selection highlighting
   useEffect(() => {
     const cy = cyRef.current;
@@ -405,46 +426,28 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
   // Build stylesheet with large-graph optimizations (no labels, straight edges)
   const stylesheet = useMemo(() => buildStylesheet(isLargeGraph), [isLargeGraph]);
 
-  // Graph search: highlight matching nodes, dim non-matching
+  // Sync Cytoscape classes with search results (external system sync)
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
 
-    if (!graphSearchQuery) {
-      // Clear search highlights
+    if (graphSearchMatchIds.length === 0 && !graphSearchQuery) {
       cy.elements().removeClass("search-match search-dimmed");
-      setGraphSearchMatchIds([]);
-      setGraphSearchIndex(0);
       return;
     }
 
-    const query = graphSearchQuery.toLowerCase();
-    const matchIds: string[] = [];
+    const matchIdSet = new Set(graphSearchMatchIds);
 
     cy.nodes().forEach((node) => {
-      const data = node.data();
-      const label = (data.label || "").toLowerCase();
-      const fqn = (data.fqn || "").toLowerCase();
-      const modifiers = (data.modifiers || []) as string[];
-      const annotations = (data.annotations || []) as { name: string }[];
-
-      const matchesLabel = label.includes(query);
-      const matchesFqn = fqn.includes(query);
-      const matchesModifier = modifiers.some((m: string) => m.toLowerCase().includes(query));
-      const matchesAnnotation = annotations.some((a: { name: string }) => a.name.toLowerCase().includes(query));
-
-      if (matchesLabel || matchesFqn || matchesModifier || matchesAnnotation) {
+      if (matchIdSet.has(node.id())) {
         node.removeClass("search-dimmed");
         node.addClass("search-match");
-        matchIds.push(node.id());
       } else {
         node.removeClass("search-match");
         node.addClass("search-dimmed");
       }
     });
 
-    // Dim edges not connected to matched nodes
-    const matchIdSet = new Set(matchIds);
     cy.edges().forEach((edge) => {
       if (matchIdSet.has(edge.source().id()) || matchIdSet.has(edge.target().id())) {
         edge.removeClass("search-dimmed");
@@ -453,19 +456,22 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
       }
     });
 
-    setGraphSearchMatchIds(matchIds);
-    if (matchIds.length > 0 && graphSearchIndex >= matchIds.length) {
-      setGraphSearchIndex(0);
-    }
-
     // Center on first match
-    if (matchIds.length > 0) {
-      const firstMatch = cy.getElementById(matchIds[0]);
+    if (graphSearchMatchIds.length > 0) {
+      const firstMatch = cy.getElementById(graphSearchMatchIds[0]);
       if (firstMatch.length) {
         cy.animate({ center: { eles: firstMatch }, duration: 200 });
       }
     }
-  }, [graphSearchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [graphSearchMatchIds, graphSearchQuery]);
+
+  // Reset search index when results shrink (React-idiomatic state adjustment)
+  if (graphSearchMatchIds.length > 0 && graphSearchIndex >= graphSearchMatchIds.length) {
+    setGraphSearchIndex(0);
+  }
+  if (graphSearchMatchIds.length === 0 && graphSearchIndex !== 0) {
+    setGraphSearchIndex(0);
+  }
 
   // Navigate graph search results
   const handleGraphSearchNext = useCallback(() => {
@@ -509,6 +515,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
 
     if (isLargeGraph && (layoutName === "fcose" || layoutName === "cose")) {
       // Off-thread layout for large force-directed graphs
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loading state for async web worker
       setLayoutInProgress(true);
       markStart("graph:layout");
 
@@ -836,7 +843,7 @@ export const GraphView = memo(forwardRef<GraphViewHandle, GraphViewProps>(functi
             onChange={(e) => setGraphSearchQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                e.shiftKey ? handleGraphSearchPrev() : handleGraphSearchNext();
+                if (e.shiftKey) { handleGraphSearchPrev(); } else { handleGraphSearchNext(); }
               }
               if (e.key === "Escape") {
                 setGraphSearchQuery("");

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useSettings } from "../../contexts/SettingsContext";
 import { usePyloid } from "../../hooks/usePyloid";
 import type { LLMProvider } from "../../types/settings";
@@ -19,10 +19,20 @@ export function LLMSettings() {
   const { detectOllama, testLlmConnection } = usePyloid();
   const llm = settings.llm;
 
+  // Key resets test state when LLM settings change
+  const settingsKey = `${llm.provider}:${llm.model}:${llm.baseUrl}:${llm.apiKey}`;
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [testError, setTestError] = useState<string | null>(null);
+  const [prevSettingsKey, setPrevSettingsKey] = useState(settingsKey);
   const [detectedModels, setDetectedModels] = useState<string[]>([]);
   const [detecting, setDetecting] = useState(false);
+
+  // Reset test status when settings change (React-idiomatic state reset)
+  if (settingsKey !== prevSettingsKey) {
+    setPrevSettingsKey(settingsKey);
+    setTestStatus("idle");
+    setTestError(null);
+  }
 
   const handleTestConnection = useCallback(async () => {
     setTestStatus("testing");
@@ -46,11 +56,6 @@ export function LLMSettings() {
     setDetecting(false);
   }, [llm.baseUrl, llm.model, detectOllama, updateCategory]);
 
-  // Reset test status when settings change
-  useEffect(() => {
-    setTestStatus("idle");
-    setTestError(null);
-  }, [llm.provider, llm.model, llm.baseUrl, llm.apiKey]);
 
   return (
     <div className="space-y-6">

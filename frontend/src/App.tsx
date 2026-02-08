@@ -30,6 +30,8 @@ const logger = createLogger("App");
 
 type AppStatus = "idle" | "scanning" | "parsing" | "generating" | "ready" | "error";
 
+const NODE_TYPE_IDS = ["class", "interface", "endpoint", "package", "file"];
+
 export function App() {
   const [projectPath, setProjectPath] = useState<string | null>(null);
   const [graph, setGraph] = useState<CodeGraph>({ nodes: [], edges: [] });
@@ -53,7 +55,7 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [detailsPanelCollapsed, setDetailsPanelCollapsed] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => !settings.general.firstRunCompleted);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const graphRef = useRef<GraphViewHandle>(null);
@@ -294,8 +296,6 @@ export function App() {
   }, [navHistory, handleNodeSelect]);
 
   // Keyboard navigation callbacks
-  const NODE_TYPE_IDS = ["class", "interface", "endpoint", "package", "file"];
-
   const keyboardCallbacks: KeyboardNavigationCallbacks = useMemo(() => ({
     focusSearch: () => sidebarRef.current?.focusSearch(),
     clearSearch: () => sidebarRef.current?.clearSearch(),
@@ -360,11 +360,10 @@ export function App() {
     };
   }, [handleLoadProject]);
 
-  // Show onboarding wizard on first run, or auto-open last project
+  // Auto-open last project on startup (wizard handled by initial state)
   useEffect(() => {
-    if (!settings.general.firstRunCompleted) {
-      setShowOnboarding(true);
-    } else if (
+    if (
+      settings.general.firstRunCompleted &&
       settings.general.openLastProjectOnStartup &&
       settings.general.lastProjectPath &&
       !projectPath
