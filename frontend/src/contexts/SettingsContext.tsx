@@ -57,6 +57,7 @@ function deepMerge(base: AppSettings, override: Partial<AppSettings>): AppSettin
     editor: { ...base.editor, ...override.editor },
     general: { ...base.general, ...override.general },
     layout: { ...base.layout, ...override.layout },
+    llm: { ...base.llm, ...override.llm },
   };
   return result;
 }
@@ -144,6 +145,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
           editor: { ...prev.editor, ...newSettings.editor },
           general: { ...prev.general, ...newSettings.general },
           layout: { ...prev.layout, ...newSettings.layout },
+          llm: { ...prev.llm, ...newSettings.llm },
         };
         saveToLocalStorage(updated);
         saveToBackend(updated);
@@ -180,6 +182,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
             editor: parsed.editor,
             general: parsed.general,
             layout: parsed.layout || DEFAULT_SETTINGS.layout,
+            llm: parsed.llm || DEFAULT_SETTINGS.llm,
           };
           setSettings(validSettings);
           saveToLocalStorage(validSettings);

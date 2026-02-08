@@ -10,6 +10,7 @@ import type {
   CodeGraph,
   SourceSnippet,
 } from "../types/graph";
+import type { LLMSettings } from "../types/settings";
 import { createLogger } from "../utils/logger";
 import { markStart, markEnd } from "../utils/perf";
 
@@ -358,6 +359,30 @@ export function usePyloid() {
     }
   }, []);
 
+  const detectOllama = useCallback(async (baseUrl: string): Promise<{ available: boolean; models: string[] }> => {
+    logger.debug("detectOllama called:", baseUrl);
+    try {
+      const result = await ipc.DocmakerAPI.detect_ollama(baseUrl);
+      const parsed = JSON.parse(result);
+      return parsed;
+    } catch (error) {
+      logger.error("detectOllama failed:", error);
+      return { available: false, models: [] };
+    }
+  }, []);
+
+  const testLlmConnection = useCallback(async (config: LLMSettings): Promise<{ success: boolean; error?: string }> => {
+    logger.debug("testLlmConnection called");
+    try {
+      const result = await ipc.DocmakerAPI.test_llm_connection(JSON.stringify(config));
+      const parsed = JSON.parse(result);
+      return parsed;
+    } catch (error) {
+      logger.error("testLlmConnection failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }, []);
+
   const clearCaches = useCallback(() => {
     classDetailsCache.current.clear();
     endpointDetailsCache.current.clear();
@@ -380,6 +405,8 @@ export function usePyloid() {
     resetSettings,
     resizeWindow,
     getWindowSize,
+    detectOllama,
+    testLlmConnection,
     clearCaches,
   };
 }

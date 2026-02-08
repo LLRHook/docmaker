@@ -3,9 +3,11 @@ import { usePyloid } from "../hooks/usePyloid";
 import { useSettings } from "../contexts/SettingsContext";
 import { GraphView, type GraphViewHandle } from "./GraphView";
 import type { CodeGraph } from "../types/graph";
+import type { LLMProvider } from "../types/settings";
+import { LLM_PROVIDER_LABELS, DEFAULT_SETTINGS } from "../types/settings";
 import type { FilterState } from "./Sidebar";
 
-type WizardStep = "welcome" | "scanning" | "results" | "explore";
+type WizardStep = "welcome" | "llmSetup" | "scanning" | "results" | "explore";
 
 interface OnboardingWizardProps {
   onComplete: (projectPath: string, graph: CodeGraph, stats: { files: number; classes: number; endpoints: number }) => void;
@@ -25,7 +27,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
   const [showPathInput, setShowPathInput] = useState(false);
   const [pathInputValue, setPathInputValue] = useState("");
 
-  const { isAvailable, selectFolder, parseOnly } = usePyloid();
+  const { isAvailable, selectFolder, parseOnly, detectOllama, testLlmConnection } = usePyloid();
   const { updateCategory } = useSettings();
   const pyloidAvailable = isAvailable();
 
@@ -55,7 +57,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
     const path = await selectFolder();
     if (path) {
       setSelectedPath(path);
-      await handleParse(path);
+      setStep("llmSetup");
     }
   }, [selectFolder]);
 
@@ -69,7 +71,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
     if (path) {
       setShowPathInput(false);
       setSelectedPath(path);
-      await handleParse(path);
+      setStep("llmSetup");
     }
   }, [pathInputValue]);
 
@@ -130,7 +132,7 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
         <div
           className="h-full bg-blue-500 transition-all duration-500"
           style={{
-            width: step === "welcome" ? "25%" : step === "scanning" ? "50%" : step === "results" ? "75%" : "100%",
+            width: step === "welcome" ? "20%" : step === "llmSetup" ? "40%" : step === "scanning" ? "60%" : step === "results" ? "80%" : "100%",
           }}
         />
       </div>
@@ -169,6 +171,25 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
           />
         )}
 
+        {step === "llmSetup" && (
+          <LLMSetupStep
+            detectOllama={detectOllama}
+            testLlmConnection={testLlmConnection}
+            updateCategory={updateCategory}
+            onContinue={() => {
+              if (selectedPath) {
+                handleParse(selectedPath);
+              }
+            }}
+            onSkip={() => {
+              updateCategory("llm", { enabled: false });
+              if (selectedPath) {
+                handleParse(selectedPath);
+              }
+            }}
+          />
+        )}
+
         {step === "scanning" && (
           <ScanningStep status={scanStatus} error={scanError} onRetry={handleRetry} />
         )}
@@ -196,11 +217,11 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
 
       {/* Step indicators */}
       <div className="flex items-center justify-center gap-2 py-4 border-t border-gray-800">
-        {(["welcome", "scanning", "results", "explore"] as WizardStep[]).map((s, i) => (
+        {(["welcome", "llmSetup", "scanning", "results", "explore"] as WizardStep[]).map((s, i) => (
           <div
             key={s}
             className={`w-2 h-2 rounded-full transition-colors ${
-              s === step ? "bg-blue-500" : i < ["welcome", "scanning", "results", "explore"].indexOf(step) ? "bg-blue-800" : "bg-gray-700"
+              s === step ? "bg-blue-500" : i < ["welcome", "llmSetup", "scanning", "results", "explore"].indexOf(step) ? "bg-blue-800" : "bg-gray-700"
             }`}
           />
         ))}
@@ -431,6 +452,235 @@ function StatCard({ label, value, icon }: { label: string; value: number; icon: 
         <span className="text-sm text-gray-400">{label}</span>
       </div>
       <span className="text-2xl font-bold text-gray-100">{value.toLocaleString()}</span>
+    </div>
+  );
+}
+
+interface LLMSetupStepProps {
+  detectOllama: (baseUrl: string) => Promise<{ available: boolean; models: string[] }>;
+  testLlmConnection: (config: import("../types/settings").LLMSettings) => Promise<{ success: boolean; error?: string }>;
+  updateCategory: <K extends keyof import("../types/settings").AppSettings>(
+    category: K,
+    values: Partial<import("../types/settings").AppSettings[K]>
+  ) => void;
+  onContinue: () => void;
+  onSkip: () => void;
+}
+
+function LLMSetupStep({ detectOllama, testLlmConnection, updateCategory, onContinue, onSkip }: LLMSetupStepProps) {
+  const [provider, setProvider] = useState<LLMProvider>("ollama");
+  const [model, setModel] = useState(DEFAULT_SETTINGS.llm.model);
+  const [baseUrl, setBaseUrl] = useState(DEFAULT_SETTINGS.llm.baseUrl);
+  const [apiKey, setApiKey] = useState("");
+  const [detectedModels, setDetectedModels] = useState<string[]>([]);
+  const [ollamaStatus, setOllamaStatus] = useState<"checking" | "found" | "not_found">("checking");
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [testError, setTestError] = useState<string | null>(null);
+
+  // Auto-detect Ollama on mount
+  useEffect(() => {
+    let cancelled = false;
+    detectOllama(DEFAULT_SETTINGS.llm.baseUrl).then((result) => {
+      if (cancelled) return;
+      if (result.available) {
+        setOllamaStatus("found");
+        setDetectedModels(result.models);
+        if (result.models.length > 0) {
+          setModel(result.models[0]);
+        }
+      } else {
+        setOllamaStatus("not_found");
+      }
+    });
+    return () => { cancelled = true; };
+  }, [detectOllama]);
+
+  const handleTest = useCallback(async () => {
+    setTestStatus("testing");
+    setTestError(null);
+    const result = await testLlmConnection({
+      enabled: true,
+      provider,
+      model,
+      baseUrl,
+      apiKey,
+      timeout: DEFAULT_SETTINGS.llm.timeout,
+    });
+    if (result.success) {
+      setTestStatus("success");
+    } else {
+      setTestStatus("error");
+      setTestError(result.error || "Connection failed");
+    }
+  }, [provider, model, baseUrl, apiKey, testLlmConnection]);
+
+  const handleContinue = useCallback(() => {
+    updateCategory("llm", {
+      enabled: true,
+      provider,
+      model,
+      baseUrl,
+      apiKey,
+      timeout: DEFAULT_SETTINGS.llm.timeout,
+    });
+    onContinue();
+  }, [provider, model, baseUrl, apiKey, updateCategory, onContinue]);
+
+  const needsUrl = provider === "ollama" || provider === "lmstudio";
+  const needsKey = provider === "openai" || provider === "anthropic";
+
+  return (
+    <div className="text-center max-w-lg px-8">
+      <div className="w-16 h-16 bg-purple-600/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-2.47 2.47a2.25 2.25 0 01-1.59.659H9.06a2.25 2.25 0 01-1.591-.659L5 14.5m14 0V17a2.25 2.25 0 01-2.25 2.25H7.25A2.25 2.25 0 015 17v-2.5" />
+        </svg>
+      </div>
+
+      <h3 className="text-2xl font-bold text-gray-100 mb-2">LLM Classification</h3>
+      <p className="text-gray-400 mb-6 leading-relaxed">
+        Docmaker can use an LLM to intelligently classify your source files. This is optional but improves accuracy.
+      </p>
+
+      {/* Ollama auto-detect status */}
+      {ollamaStatus === "checking" && (
+        <div className="flex items-center justify-center gap-2 text-sm text-gray-400 mb-6">
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          Checking for Ollama...
+        </div>
+      )}
+
+      {ollamaStatus === "found" && (
+        <div className="flex items-center justify-center gap-2 text-sm text-green-400 mb-6 bg-green-950/30 rounded-lg px-4 py-2">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Ollama detected — {detectedModels.length} model{detectedModels.length !== 1 ? "s" : ""} available
+        </div>
+      )}
+
+      {ollamaStatus === "not_found" && (
+        <div className="text-sm text-gray-500 mb-6 bg-gray-800/50 rounded-lg px-4 py-2">
+          Ollama not detected at default URL. You can configure a different provider or skip this step.
+        </div>
+      )}
+
+      {/* Provider selector */}
+      <div className="text-left space-y-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">Provider</label>
+          <select
+            value={provider}
+            onChange={(e) => {
+              setProvider(e.target.value as LLMProvider);
+              setTestStatus("idle");
+            }}
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+          >
+            {(["ollama", "lmstudio", "openai", "anthropic"] as LLMProvider[]).map((p) => (
+              <option key={p} value={p}>{LLM_PROVIDER_LABELS[p]}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">Model</label>
+          <input
+            type="text"
+            value={model}
+            onChange={(e) => { setModel(e.target.value); setTestStatus("idle"); }}
+            placeholder="llama3.2"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+          />
+          {detectedModels.length > 0 && provider === "ollama" && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {detectedModels.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => { setModel(m); setTestStatus("idle"); }}
+                  className={`px-2 py-1 text-xs rounded border transition-colors ${
+                    m === model
+                      ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                      : "bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-600"
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {needsUrl && (
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Base URL</label>
+            <input
+              type="text"
+              value={baseUrl}
+              onChange={(e) => { setBaseUrl(e.target.value); setTestStatus("idle"); }}
+              placeholder="http://localhost:11434"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        )}
+
+        {needsKey && (
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">API Key</label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => { setApiKey(e.target.value); setTestStatus("idle"); }}
+              placeholder="sk-..."
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-100 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        )}
+
+        {/* Test Connection */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleTest}
+            disabled={testStatus === "testing"}
+            className="px-4 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-gray-300 hover:text-white hover:border-gray-600 transition-colors disabled:opacity-50"
+          >
+            {testStatus === "testing" ? "Testing..." : "Test Connection"}
+          </button>
+          {testStatus === "success" && (
+            <span className="flex items-center gap-1.5 text-sm text-green-400">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Connected
+            </span>
+          )}
+          {testStatus === "error" && (
+            <span className="text-sm text-red-400">{testError}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col gap-3 items-center">
+        <button
+          onClick={handleContinue}
+          className="w-72 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+        >
+          Continue
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </button>
+        <button
+          onClick={onSkip}
+          className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
+        >
+          Skip — scan without LLM
+        </button>
+      </div>
     </div>
   );
 }

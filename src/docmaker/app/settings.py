@@ -41,6 +41,14 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "sidebarWidth": 288,
         "detailsPanelWidth": 320,
     },
+    "llm": {
+        "enabled": True,
+        "provider": "ollama",
+        "model": "llama3.2",
+        "baseUrl": "http://localhost:11434",
+        "apiKey": "",
+        "timeout": 30,
+    },
 }
 
 

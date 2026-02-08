@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import httpx
 from pyloid.ipc import Bridge, PyloidIPC
 from PySide6.QtWidgets import QFileDialog
 
@@ -16,8 +17,9 @@ from docmaker.app.settings import (
     reset_settings,
     save_settings,
 )
-from docmaker.config import DocmakerConfig
+from docmaker.config import DocmakerConfig, LLMConfig
 from docmaker.crawler import FileCrawler
+from docmaker.llm import create_llm_provider
 from docmaker.models import FileCategory, SourceFile, SymbolTable
 from docmaker.parser.registry import get_parser_registry
 from docmaker.pipeline import Pipeline
@@ -81,9 +83,9 @@ class DocmakerAPI(PyloidIPC):
                 return json.dumps({"error": f"Path is not a directory: {path}"})
 
             self._current_project = project_path
-            self._config = DocmakerConfig.load(None)
+            self._config = DocmakerConfig.load(project_path / "docmaker.yaml")
             self._config.source_dir = project_path
-            self._config.llm.enabled = False
+            self._apply_user_llm_settings()
 
             crawler = FileCrawler(self._config)
             self._files = crawler.crawl()
@@ -228,9 +230,9 @@ class DocmakerAPI(PyloidIPC):
                 return json.dumps({"error": f"Path does not exist: {path}"})
 
             self._current_project = project_path
-            self._config = DocmakerConfig.load(None)
+            self._config = DocmakerConfig.load(project_path / "docmaker.yaml")
             self._config.source_dir = project_path
-            self._config.llm.enabled = False
+            self._apply_user_llm_settings()
 
             # Crawl files
             crawler = FileCrawler(self._config)
@@ -653,6 +655,76 @@ class DocmakerAPI(PyloidIPC):
         except Exception as e:
             logger.exception("Error reading source snippet")
             return json.dumps({"error": str(e)})
+
+    def _apply_user_llm_settings(self) -> None:
+        """Override self._config.llm fields with user settings from settings.json."""
+        if not self._config:
+            return
+        try:
+            user_llm = load_settings().get("llm", {})
+            if user_llm:
+                self._config.llm.enabled = user_llm.get("enabled", self._config.llm.enabled)
+                self._config.llm.provider = user_llm.get("provider", self._config.llm.provider)
+                self._config.llm.model = user_llm.get("model", self._config.llm.model)
+                self._config.llm.base_url = user_llm.get("baseUrl", self._config.llm.base_url)
+                api_key = user_llm.get("apiKey", "")
+                if api_key:
+                    self._config.llm.api_key = api_key
+                self._config.llm.timeout = user_llm.get("timeout", self._config.llm.timeout)
+        except Exception as e:
+            logger.warning("Failed to apply user LLM settings: %s", e)
+
+    @Bridge(str, result=str)
+    def detect_ollama(self, base_url: str) -> str:
+        """Detect Ollama at the given base URL and list available models.
+
+        Args:
+            base_url: The Ollama server base URL
+
+        Returns:
+            JSON string with { available: bool, models: string[] }
+        """
+        logger.debug("detect_ollama called with base_url: %s", base_url)
+        try:
+            with httpx.Client(timeout=5) as client:
+                response = client.get(f"{base_url.rstrip('/')}/api/tags")
+                if response.status_code == 200:
+                    data = response.json()
+                    models = [m["name"] for m in data.get("models", [])]
+                    return json.dumps({"available": True, "models": models})
+                return json.dumps({"available": False, "models": []})
+        except Exception:
+            return json.dumps({"available": False, "models": []})
+
+    @Bridge(str, result=str)
+    def test_llm_connection(self, config_json: str) -> str:
+        """Test the LLM connection with the given configuration.
+
+        Args:
+            config_json: JSON string with LLM settings
+
+        Returns:
+            JSON string with { success: bool, error?: string }
+        """
+        logger.debug("test_llm_connection called")
+        try:
+            config = json.loads(config_json)
+            llm_config = LLMConfig(
+                enabled=True,
+                provider=config.get("provider", "ollama"),
+                model=config.get("model", "llama3.2"),
+                base_url=config.get("baseUrl", "http://localhost:11434"),
+                api_key=config.get("apiKey") or None,
+                timeout=config.get("timeout", 30),
+            )
+            provider = create_llm_provider(llm_config)
+            available = provider.is_available()
+            if available:
+                return json.dumps({"success": True})
+            return json.dumps({"success": False, "error": "Provider not available"})
+        except Exception as e:
+            logger.exception("Error testing LLM connection")
+            return json.dumps({"success": False, "error": str(e)})
 
     @Bridge(result=str)
     def get_window_size(self) -> str:
