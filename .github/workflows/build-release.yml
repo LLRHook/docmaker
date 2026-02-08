@@ -20,12 +20,6 @@ jobs:
           - os: windows-latest
             artifact: Docmaker-Windows
             ext: .zip
-          - os: macos-latest
-            artifact: Docmaker-macOS
-            ext: .zip
-          - os: ubuntu-latest
-            artifact: Docmaker-Linux
-            ext: .tar.gz
 
     runs-on: ${{ matrix.os }}
 
