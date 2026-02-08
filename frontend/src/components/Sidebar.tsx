@@ -70,6 +70,24 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
     return new Set();
   });
 
+  const toggleNodeType = useCallback((typeId: string) => {
+    setActiveNodeTypes((prev) => {
+      const newTypes = new Set(prev);
+      if (newTypes.has(typeId)) {
+        newTypes.delete(typeId);
+      } else {
+        newTypes.add(typeId);
+      }
+      onFilterChange({
+        nodeTypes: newTypes,
+        categories: activeCategories,
+        edgeTypes: activeEdgeTypes,
+        searchQuery,
+      });
+      return newTypes;
+    });
+  }, [activeCategories, activeEdgeTypes, searchQuery, onFilterChange]);
+
   // Expose imperative handle for keyboard navigation
   useImperativeHandle(ref, () => ({
     focusSearch() {
@@ -104,7 +122,7 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
         searchQuery: "",
       });
     },
-  }), [nodes, activeNodeTypes, activeCategories, activeEdgeTypes, searchQuery, onFilterChange]);
+  }), [nodes, activeNodeTypes, activeCategories, activeEdgeTypes, searchQuery, onFilterChange, toggleNodeType]);
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -134,21 +152,6 @@ export const Sidebar = memo(forwardRef<SidebarHandle, SidebarProps>(function Sid
     }, 200);
   }, [activeNodeTypes, activeCategories, activeEdgeTypes, onFilterChange]);
 
-  const toggleNodeType = (typeId: string) => {
-    const newTypes = new Set(activeNodeTypes);
-    if (newTypes.has(typeId)) {
-      newTypes.delete(typeId);
-    } else {
-      newTypes.add(typeId);
-    }
-    setActiveNodeTypes(newTypes);
-    onFilterChange({
-      nodeTypes: newTypes,
-      categories: activeCategories,
-      edgeTypes: activeEdgeTypes,
-      searchQuery,
-    });
-  };
 
   const toggleCategory = (categoryId: string) => {
     const newCategories = new Set(activeCategories);

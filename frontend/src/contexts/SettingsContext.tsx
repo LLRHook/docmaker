@@ -230,6 +230,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSettings(): SettingsContextValue {
   const context = useContext(SettingsContext);
   if (!context) {
