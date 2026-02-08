@@ -51,7 +51,10 @@ hidden_imports = [
     "docmaker.parser",
     "docmaker.parser.registry",
     "docmaker.parser.base_parser",
+    "docmaker.parser.go_parser",
     "docmaker.parser.java_parser",
+    "docmaker.parser.javascript_parser",
+    "docmaker.parser.kotlin_parser",
     "docmaker.parser.python_parser",
     "docmaker.parser.typescript_parser",
     "docmaker.generator",
@@ -59,7 +62,10 @@ hidden_imports = [
     "docmaker.generator.markdown",
     # Tree-sitter grammars
     "tree_sitter",
+    "tree_sitter_go",
     "tree_sitter_java",
+    "tree_sitter_javascript",
+    "tree_sitter_kotlin",
     "tree_sitter_python",
     "tree_sitter_typescript",
     # Pyloid and PySide6
