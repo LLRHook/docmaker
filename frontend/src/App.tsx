@@ -55,7 +55,6 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [detailsPanelCollapsed, setDetailsPanelCollapsed] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(() => !settings.general.firstRunCompleted);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const graphRef = useRef<GraphViewHandle>(null);
@@ -63,6 +62,8 @@ export function App() {
 
   const { isAvailable, selectFolder, parseOnly, openFile, clearCaches } = usePyloid();
   const { settings, updateCategory } = useSettings();
+
+  const [showOnboarding, setShowOnboarding] = useState(() => !settings.general.firstRunCompleted);
   const navHistory = useNavigationHistory();
 
   // Check if running in Pyloid (now reactive)
