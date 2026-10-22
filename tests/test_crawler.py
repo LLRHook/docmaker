@@ -1,5 +1,7 @@
 """Tests for the file crawler."""
 
+import builtins
+import os
 import tempfile
 from pathlib import Path
 
@@ -121,3 +123,91 @@ def test_crawler_categorizes_backend_files(temp_repo):
 
     backend_files = [f for f in files if f.category == FileCategory.BACKEND]
     assert len(backend_files) >= 1
+
+
+@pytest.mark.parametrize("ancestor", ["test_checkout", "configuration", "frontend", "backend"])
+def test_crawler_categories_do_not_depend_on_checkout_location(temp_repo, ancestor):
+    root = temp_repo / ancestor / "project"
+    root.mkdir(parents=True)
+    (root / "App.java").write_text("class App {}")
+    (root / "tests").mkdir()
+    (root / "tests" / "AppTest.java").write_text("class AppTest {}")
+    config = DocmakerConfig(source_dir=root)
+    config.llm.enabled = False
+
+    files = {file.relative_path: file for file in FileCrawler(config).crawl()}
+
+    assert files[Path("App.java")].category == FileCategory.UNKNOWN
+    assert files[Path("tests/AppTest.java")].category == FileCategory.TEST
+
+
+def test_crawler_does_not_ingest_symlinks_outside_source_directory(tmp_path):
+    root = tmp_path / "project"
+    root.mkdir()
+    external = tmp_path / "private.java"
+    external.write_text("class Private {}")
+    (root / "External.java").symlink_to(external)
+    (root / "App.java").write_text("class App {}")
+    (root / "Alias.java").symlink_to(root / "App.java")
+    config = DocmakerConfig(source_dir=root)
+
+    files = FileCrawler(config).crawl()
+
+    assert {file.relative_path for file in files} == {Path("App.java"), Path("Alias.java")}
+
+
+def test_crawler_does_not_follow_symlinks_to_ignored_files(tmp_path):
+    ignored_dir = tmp_path / ".git"
+    ignored_dir.mkdir()
+    ignored = ignored_dir / "Private.java"
+    ignored.write_text("class Private {}")
+    (tmp_path / "Alias.java").symlink_to(ignored)
+    (tmp_path / "App.java").write_text("class App {}")
+
+    files = FileCrawler(DocmakerConfig(source_dir=tmp_path)).crawl()
+
+    assert [file.relative_path for file in files] == [Path("App.java")]
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="Named pipes require POSIX")
+def test_crawler_does_not_read_named_pipes(tmp_path, monkeypatch):
+    pipe = tmp_path / "stream.java"
+    os.mkfifo(pipe)
+    (tmp_path / "App.java").write_text("class App {}")
+    crawler = FileCrawler(DocmakerConfig(source_dir=tmp_path))
+    read_header = crawler._read_header
+    compute_hash = crawler._compute_hash
+
+    def checked_header(path, num_lines):
+        assert path != pipe, "Reading a named pipe would hang the scan"
+        return read_header(path, num_lines)
+
+    def checked_hash(path):
+        assert path != pipe, "Hashing a named pipe would hang the scan"
+        return compute_hash(path)
+
+    monkeypatch.setattr(crawler, "_read_header", checked_header)
+    monkeypatch.setattr(crawler, "_compute_hash", checked_hash)
+
+    assert [file.relative_path for file in crawler.crawl()] == [Path("App.java")]
+
+
+@pytest.mark.parametrize("error", [PermissionError, FileNotFoundError])
+def test_crawler_continues_after_file_becomes_unreadable(tmp_path, monkeypatch, caplog, error):
+    (tmp_path / "Unavailable.java").write_text("class Unavailable {}")
+    (tmp_path / "App.java").write_text("class App {}")
+    config = DocmakerConfig(source_dir=tmp_path)
+    config.llm.enabled = False
+    crawler = FileCrawler(config)
+    real_open = builtins.open
+
+    def failing_open(path, *args, **kwargs):
+        if path == tmp_path / "Unavailable.java":
+            raise error("File became unavailable after stat")
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", failing_open)
+
+    assert [file.relative_path for file in crawler.crawl()] == [Path("App.java")]
+    assert "Skipping unavailable source file" in caplog.text
+    assert "Unavailable.java" in caplog.text

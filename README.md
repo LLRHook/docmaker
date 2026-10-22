@@ -102,6 +102,11 @@ docmaker generate /path/to/source --no-llm
 docmaker scan /path/to/source
 ```
 
+File categories use paths relative to the selected repository. Scanning skips special files
+such as named pipes, and includes file symlinks only when their targets remain inside the
+repository and pass its ignore rules. Files that become unreadable or disappear during a
+scan are skipped with a warning so the remaining files can still be processed.
+
 ### Clear Cache
 
 ```bash
