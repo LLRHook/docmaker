@@ -1,8 +1,11 @@
 """Markdown generator for Obsidian documentation."""
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
+
+import yaml
 
 from docmaker.config import OutputConfig
 from docmaker.generator.linker import ImportLinker
@@ -16,6 +19,31 @@ from docmaker.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _FrontmatterDumper(yaml.SafeDumper):
+    """Keep block lists indented for the existing Obsidian metadata format."""
+
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow, False)
+
+
+def _format_frontmatter(metadata: dict[str, object]) -> str:
+    content = yaml.dump(
+        metadata,
+        Dumper=_FrontmatterDumper,
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    )
+    return f"---\n{content}---\n"
+
+
+def _fenced_code_block(source: str, language: str) -> str:
+    """Choose a fence that cannot be closed by backticks in the source."""
+    longest_run = max((len(match[0]) for match in re.finditer(r"`+", source)), default=0)
+    fence = "`" * max(3, longest_run + 1)
+    return f"{fence}{language}\n{source}\n{fence}"
 
 
 class MarkdownGenerator:
@@ -132,25 +160,19 @@ class MarkdownGenerator:
         # Collect class names as aliases so [[ClassName]] WikiLinks resolve
         aliases = [cls.name for cls in file_symbols.classes]
 
-        lines = [
-            "---",
-            f"title: {file_symbols.file.relative_path.stem}",
-            f"path: {file_symbols.file.relative_path}",
-            f"language: {file_symbols.file.language.value}",
-            f"category: {file_symbols.file.category.value}",
-            "tags:",
-        ]
-        for tag in tags:
-            lines.append(f"  - {tag}")
+        metadata: dict[str, object] = {
+            "title": file_symbols.file.relative_path.stem,
+            "path": str(file_symbols.file.relative_path),
+            "language": file_symbols.file.language.value,
+            "category": file_symbols.file.category.value,
+            "tags": tags,
+        }
         if aliases:
-            lines.append("aliases:")
-            for alias in aliases:
-                lines.append(f"  - {alias}")
+            metadata["aliases"] = aliases
         if file_symbols.package:
-            lines.append(f"package: {file_symbols.package}")
-        lines.append(f"generated: {datetime.now().isoformat()}")
-        lines.append("---\n")
-        return "\n".join(lines)
+            metadata["package"] = file_symbols.package
+        metadata["generated"] = datetime.now().isoformat()
+        return _format_frontmatter(metadata)
 
     def _generate_class_doc(self, cls: ClassDef, file_symbols: FileSymbols) -> str:
         """Generate documentation for a class."""
@@ -252,9 +274,7 @@ class MarkdownGenerator:
             lang = file_symbols.file.language.value
             lines.append("<details>")
             lines.append("<summary>Source Code</summary>\n")
-            lines.append(f"```{lang}")
-            lines.append(snippet)
-            lines.append("```")
+            lines.append(_fenced_code_block(snippet, lang))
             lines.append("</details>\n")
 
         lines.append(f"📍 *Line {method.line_number}*\n")
@@ -298,9 +318,7 @@ class MarkdownGenerator:
             lang = file_symbols.file.language.value
             lines.append("<details>")
             lines.append("<summary>Source Code</summary>\n")
-            lines.append(f"```{lang}")
-            lines.append(snippet)
-            lines.append("```")
+            lines.append(_fenced_code_block(snippet, lang))
             lines.append("</details>\n")
 
         return "\n".join(lines)
@@ -387,9 +405,7 @@ class MarkdownGenerator:
             lang = file_symbols.file.language.value
             lines.append("<details>")
             lines.append("<summary>Handler Source Code</summary>\n")
-            lines.append(f"```{lang}")
-            lines.append(snippet)
-            lines.append("```")
+            lines.append(_fenced_code_block(snippet, lang))
             lines.append("</details>\n")
 
         lines.append(f"📍 *{endpoint.file_path.name}:{endpoint.line_number}*\n")
@@ -559,16 +575,11 @@ class MarkdownGenerator:
             pkg_name = pkg.split(".")[-1] if pkg else "root"
             moc_title = f"MOC - {pkg_name}" if pkg else "MOC - Root"
 
-            lines = []
-            lines.append("---")
-            lines.append(f"title: {moc_title}")
-            lines.append("tags:")
-            lines.append("  - MOC")
-            lines.append("  - package")
+            metadata: dict[str, object] = {"title": moc_title, "tags": ["MOC", "package"]}
             if pkg:
-                lines.append(f"package: {pkg}")
-            lines.append(f"generated: {datetime.now().isoformat()}")
-            lines.append("---\n")
+                metadata["package"] = pkg
+            metadata["generated"] = datetime.now().isoformat()
+            lines = [_format_frontmatter(metadata)]
 
             lines.append(f"# {moc_title}\n")
 

@@ -1,13 +1,17 @@
 """File crawler for traversing repositories and identifying source files."""
 
 import hashlib
+import logging
 import os
 from pathlib import Path
+from stat import S_ISREG
 
 import pathspec
 
 from docmaker.config import DocmakerConfig
 from docmaker.models import FileCategory, Language, SourceFile
+
+logger = logging.getLogger(__name__)
 
 
 class FileCrawler:
@@ -109,7 +113,7 @@ class FileCrawler:
 
     def _categorize_by_path(self, path: Path) -> FileCategory:
         """Quick categorization based on file path patterns."""
-        path_str = str(path).lower().replace("\\", "/")
+        path_str = "/" + path.relative_to(self.source_dir).as_posix().lower()
 
         test_patterns = [
             "/test/",
@@ -197,11 +201,20 @@ class FileCrawler:
                     continue
 
                 try:
+                    resolved_path = file_path.resolve(strict=True)
+                    if not resolved_path.is_relative_to(self.source_dir):
+                        continue
+                    if self._should_ignore(resolved_path):
+                        continue
+
                     stat = file_path.stat()
-                    if stat.st_size > max_size:
+                    if not S_ISREG(stat.st_mode) or stat.st_size > max_size:
                         continue
                     size_bytes = stat.st_size
-                except OSError:
+
+                    file_hash = self._compute_hash(file_path)
+                except (OSError, RuntimeError) as exc:
+                    logger.warning("Skipping unavailable source file %s: %s", file_path, exc)
                     continue
 
                 relative_path = file_path.relative_to(self.source_dir)
@@ -213,8 +226,6 @@ class FileCrawler:
                     header_content = self._read_header(
                         file_path, self.config.crawler.header_lines_for_classification
                     )
-
-                file_hash = self._compute_hash(file_path)
 
                 source_file = SourceFile(
                     path=file_path,

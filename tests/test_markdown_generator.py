@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from docmaker.config import OutputConfig
 from docmaker.generator.markdown import MarkdownGenerator
@@ -137,6 +138,47 @@ def symbol_table():
 
 class TestFrontmatter:
     """Test YAML frontmatter generation for Obsidian compatibility."""
+
+    @pytest.mark.parametrize(
+        "stem", ["on", "null", "123", "feature: draft", "feature #1", "[draft]", "a\nb"]
+    )
+    def test_source_metadata_round_trips_as_yaml_strings(self, output_config, stem):
+        fs = FileSymbols(
+            file=_make_source_file(f"src/{stem}.py", language=Language.PYTHON),
+            package=stem,
+            classes=[
+                ClassDef(
+                    name="on",
+                    file_path=Path("/project/src/module.py"),
+                    line_number=1,
+                    end_line=2,
+                )
+            ],
+        )
+        gen = MarkdownGenerator(output_config, _make_symbol_table(fs))
+
+        content = gen._generate_frontmatter(fs)
+        metadata = yaml.safe_load(content.split("---\n", 2)[1])
+
+        assert metadata["title"] == stem
+        assert metadata["path"] == f"src/{stem}.py"
+        assert metadata["package"] == stem
+        assert metadata["aliases"] == ["on"]
+        assert metadata["tags"] == ["python", "backend"]
+
+    @pytest.mark.parametrize("package", ["on", "feature: draft", "feature #1", "a\nb"])
+    def test_package_map_metadata_round_trips(self, output_config, package):
+        fs = FileSymbols(file=_make_source_file("src/App.py"), package=package)
+        gen = MarkdownGenerator(output_config, _make_symbol_table(fs))
+
+        generated = gen._generate_moc_pages()
+
+        assert len(generated) == 1
+        content = generated[0].read_text()
+        metadata = yaml.safe_load(content.split("---\n", 2)[1])
+        assert metadata["title"] == f"MOC - {package}"
+        assert metadata["package"] == package
+        assert metadata["tags"] == ["MOC", "package"]
 
     def test_tags_use_yaml_list_format(self, output_config):
         """Obsidian requires tags as a YAML list, not inline array."""
@@ -1001,3 +1043,22 @@ def test_frontmatter_tags(output_dir, symbol_table):
     assert "controller" in doc
     assert "java" in doc
     assert "backend" in doc
+
+
+@pytest.mark.parametrize("kind", ["method", "function", "endpoint"])
+def test_source_snippets_cannot_close_their_markdown_fence(output_dir, symbol_table, kind):
+    gen = MarkdownGenerator(OutputConfig(output_dir=output_dir), symbol_table)
+    fs = next(iter(symbol_table.files.values()))
+    source = 'String example = """\n```\n# Keep this inside the code block\n````\n""";'
+    if kind == "method":
+        cls = fs.classes[0]
+        cls.methods[0].source_code = source
+        content = gen._generate_method_doc(cls.methods[0], cls, fs)
+    elif kind == "function":
+        fs.functions[0].source_code = source
+        content = gen._generate_function_doc(fs.functions[0], fs)
+    else:
+        fs.endpoints[0].source_code = source
+        content = gen._generate_endpoint_doc(fs.endpoints[0], fs)
+
+    assert f"`````java\n{source}\n`````" in content
